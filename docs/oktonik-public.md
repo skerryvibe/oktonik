@@ -19,7 +19,7 @@ its own save file is absent; original data is never written. No ongoing sync.
 - Shift + chord pad opens per-pad editing; repeat to exit.
 - CHORD knob 7 STRUM: ascending note spacing in milliseconds.
 - Bass Gesture: hold a chord pad, press another to choose its root as bass.
-  Releases do not choose a new chord. Release all pads before the next chord.
+  Release all pads before the next chord.
 - Each part has sustain options and MIDI routing. CC64 affects an entire channel;
   use separate channels for parts with different sustain requirements.
 - STOP pad releases all module notes and sustain.
