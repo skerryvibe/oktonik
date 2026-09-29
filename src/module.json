@@ -1,0 +1,15 @@
+{
+  "id": "oktonik-lab",
+  "name": "OKTONIK Lab",
+  "abbrev": "OKTL",
+  "version": "0.1.0-rc.2",
+  "description": "Harmonic performance instrument",
+  "author": "Skerry Vibe",
+  "license": "MIT",
+  "ui": "ui.js",
+  "dsp": "dsp.so",
+  "api_version": 2,
+  "component_type": "tool",
+  "tool_config": { "interactive": true, "skip_file_browser": true, "overtake": true },
+  "capabilities": { "midi_out": true, "suspend_keeps_js": true, "button_passthrough": [85, 86] }
+}

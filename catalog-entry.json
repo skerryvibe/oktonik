@@ -1,0 +1,10 @@
+{
+  "id": "oktonik",
+  "name": "OKTONIK",
+  "description": "Harmonic performance instrument",
+  "author": "Skerry Vibe",
+  "component_type": "tool",
+  "github_repo": "skerryvibe/oktonik",
+  "default_branch": "main",
+  "asset_name": "oktonik-public-0.1.0-rc.2.tar.gz"
+}

@@ -1,0 +1,13 @@
+{
+  "name": "oktonik",
+  "version": "0.1.0-rc.2",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "test": "sh scripts/test.sh",
+    "preview": "node scripts/render-preview.mjs",
+    "build": "sh scripts/build.sh",
+    "verify": "sh scripts/verify-package.sh"
+  }
+}

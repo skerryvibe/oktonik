@@ -1,0 +1,492 @@
+{
+  "title": "OKTONIK Lab",
+  "children": [
+    {
+      "title": "Timing and quantization",
+      "lines": [
+        "SEQ knob 6 QNT: 0-100 percent.",
+        "0: keep played timing.",
+        "70: move 70 percent to grid.",
+        "100: full RATE quantization.",
+        "Original timing remains saved.",
+        "Changing RATE scales timing.",
+        "Up to 8 events in each step.",
+        "Hold step; knob 8 EVENT selects.",
+        "Delete step clears its events.",
+        "Lights show original-time cells.",
+        "Same-time ties: later event wins.",
+        "Overflow stops REC; Undo available.",
+        "QNT change finishes armed Record.",
+        "Use beta.26+ to retain new timing."
+      ]
+    },
+    {
+      "title": "Page steps and Undo",
+      "lines": [
+        "BASS page: bass steps.",
+        "CHORDS page: chord steps.",
+        "SEQ PART still chooses the lane.",
+        "MELODY steps await its recorder.",
+        "During REC: step auditions blocked.",
+        "Undo restores the last recording.",
+        "Also restores overwritten events.",
+        "Undo stops playback and recording.",
+        "One level; no redo or saved history.",
+        "Manual step edits clear Undo.",
+        "R.PRT controls what is recorded.",
+        "QNT on SEQ; Capture/clips later."
+      ]
+    },
+    {
+      "title": "Strum expression",
+      "lines": [
+        "Main encoder: open STRUM page.",
+        "GAP: note spacing 0-100 ms.",
+        "Zero: simultaneous notes.",
+        "DIR: UP / DOWN / ALT / RAND.",
+        "ALT alternates chord attacks.",
+        "RAND shuffles only chord tones.",
+        "TIME: gap variation 0-100%.",
+        "VEL: attack variation 0-100%.",
+        "Changes affect the next attack.",
+        "Bass, melody and ARP stay separate.",
+        "Steps retain strum parameters.",
+        "STOP cancels queued notes."
+      ]
+    },
+    {
+      "title": "Sustain per part",
+      "lines": [
+        "CHORDS 8 / MELODY 5 / BASS 6.",
+        "OFF: release with the pad.",
+        "HOLD: notes stay until next chord.",
+        "PEDAL: CC64, note-off on release.",
+        "Pedal lifts at the next chord.",
+        "CC64 needs instrument support.",
+        "Shared MIDI channel shares pedal!",
+        "Separate channels for independence.",
+        "STOP releases pedals and notes.",
+        "ARP HOLD keeps its pattern source."
+      ]
+    },
+    {
+      "title": "Bass velocity",
+      "lines": [
+        "BASS knob 7 VEL: PAD / FIXED.",
+        "PAD follows chord-pad attack.",
+        "Gesture uses bass-selector attack.",
+        "FIXED uses knob 3 B.VEL.",
+        "New projects start with PAD.",
+        "Old projects retain FIXED.",
+        "FOLLOW sequence uses B.VEL.",
+        "CLIP keeps recorded velocity."
+      ]
+    },
+    {
+      "title": "PLAY / Chord Map",
+      "lines": [
+        "Start view: eight chord choices.",
+        "Top A5-A8, bottom A1-A4.",
+        "Hold modifiers: preview instantly.",
+        "Header: played chord. Grid: next.",
+        "Preview never sends notes.",
+        "Touch matching knob: longer name.",
+        "Turning PLAY knobs changes nothing.",
+        "Bass gesture: slash in header only.",
+        "Shift + pad: edit; repeat to return."
+      ]
+    },
+    {
+      "title": "Live bass gesture",
+      "lines": [
+        "BASS: BASS ON and GEST ON.",
+        "Hold F, press Em: F/E bass.",
+        "Release never selects harmony.",
+        "F/E stays while any pad is held.",
+        "Press F again: bass F only.",
+        "Last press picks the bass root.",
+        "All pads up: gesture ends.",
+        "Each part follows its own SUST.",
+        "Next press starts a new chord.",
+        "Nearest bass octave is used.",
+        "Shift + Step saves slash bass.",
+        "EDIT and ARP notes stay intact."
+      ]
+    },
+    {
+      "title": "Arpeggiator",
+      "lines": [
+        "ARP ON; choose SYNC or FREE.",
+        "MIDI: own output and channel.",
+        "Default channel 2; choose receiver.",
+        "RATE: 1/16 through one bar.",
+        "DIR: UP, DOWN, UP/DN, RAND, CHORD.",
+        "CHORD: whole voicing on each beat.",
+        "RATE sets the pulse interval.",
+        "RANGE: 1-4 octaves, not in CHORD.",
+        "GATE, SWING, VEL shape attacks.",
+        "HOLD keeps last live chord.",
+        "Loop takes priority; gaps rest.",
+        "New pitches reset note sequence.",
+        "STOP clears held ARP source.",
+        "SYNC needs Play; FREE needs a chord."
+      ]
+    },
+    {
+      "title": "ARP clock",
+      "lines": [
+        "A.CLOCK knob 1: SYNC / FREE.",
+        "SYNC follows Move Play and tempo.",
+        "FREE starts from a chord attack.",
+        "Knob 2: FREE tempo 30-300 BPM.",
+        "HOLD keeps the last chord source.",
+        "STOP always clears held ARP notes.",
+        "Clock/tempo changes restart phase.",
+        "FREE does not start the sequencer."
+      ]
+    },
+    {
+      "title": "Hands",
+      "lines": [
+        "LEFT lower pads: eight chords.",
+        "All 16 RIGHT pads: melody.",
+        "Bottom row first, then upward.",
+        "Above chords: DOM, M/m, SUS2, SUS4.",
+        "Top left row: II, SUB, BORROW, STOP.",
+        "Blue STOP is above SUS4."
+      ]
+    },
+    {
+      "title": "Pages",
+      "lines": [
+        "PLAY, CHORDS, STRUM, IDEAS, MELODY,",
+        "BASS, ARP, A.CLOCK, SEQ, MIDI,",
+        "THEORY.",
+        "Main knob or Menu changes page.",
+        "Touch a knob for its meaning."
+      ]
+    },
+    {
+      "title": "Chords",
+      "lines": [
+        "KEY / SCALE: global tonality.",
+        "EXT: default chord extension.",
+        "Pad 8 is a regular editable chord.",
+        "SPRD: voicing width; starts CLOSE.",
+        "LEAD: smooth changes; starts OFF.",
+        "Inversion is edited per pad.",
+        "Knob 7 is unused.",
+        "Shift + chord pad: edit that pad.",
+        "OCT: chord register.",
+        "SUST HOLD: ring to next chord.",
+        "SUST OFF: release with pad."
+      ]
+    },
+    {
+      "title": "Edit one chord",
+      "lines": [
+        "EDIT 1-8 shows the selected pad.",
+        "ROOT / TYPE / EXT: that pad only.",
+        "TYPE: AUTO, MAJ, MIN, DIM,",
+        "AUG, SUS2 or SUS4.",
+        "EXT: explicit 7, MAJ7, 9 and more.",
+        "INV AUTO: follow voice leading.",
+        "INV ROOT or number: fixed inversion.",
+        "SPRD: voicing width for this pad.",
+        "All eight controls on one page.",
+        "B.NTE: AUTO / ROOT / LOW / C-B.",
+        "Explicit note includes octave: B1.",
+        "Shift + knob 8: bass octave.",
+        "AUTO follows BASS bass note.",
+        "BASS BASS must also be ON."
+      ]
+    },
+    {
+      "title": "Edit tools",
+      "lines": [
+        "KEEP: store the played variation.",
+        "Kept shape follows KEY, not SCALE.",
+        "AUTO uses scale or kept shape.",
+        "RESET: clear this pad's edits.",
+        "KEEP is knob 6; RESET is knob 7.",
+        "Shift + same pad: exit EDIT.",
+        "Main knob stays on this EDIT page.",
+        "KEEP also clears the BORROW lock.",
+        "Other pads stay unchanged."
+      ]
+    },
+    {
+      "title": "Melody",
+      "lines": [
+        "MODE: CHORD / SCALE / CHROM.",
+        "M.OCT: melody octave.",
+        "ADAPT: available in SCALE mode.",
+        "TRACK: held notes in CHORD mode.",
+        "NEAR: nearest new chord tone.",
+        "PAD: fixed chord-tone position.",
+        "Shared notes always restrike.",
+        "Root: purple. Chord tones: blue.",
+        "Other scale tones: white.",
+        "Outside-scale chromatic: grey.",
+        "HOLD never changes these colors.",
+        "Outputs and channels: MIDI page."
+      ]
+    },
+    {
+      "title": "Bass",
+      "lines": [
+        "BASS: enable automatic bass.",
+        "GEST: hold chord, tap bass root.",
+        "B.OCT: independent, -5 to +6.",
+        "B.VEL: bass velocity.",
+        "B.NTE ROOT: chord root.",
+        "B.NTE LOW: lowest voiced note.",
+        "LOW follows LEAD and inversion.",
+        "EDIT can choose an explicit bass.",
+        "Explicit notes ignore global B.OCT.",
+        "EDIT B.NTE overrides one pad.",
+        "Melody octave: MELODY page.",
+        "STOP above SUS4 ends held sounds."
+      ]
+    },
+    {
+      "title": "STOP / kill notes",
+      "lines": [
+        "Fourth pad in the top left row.",
+        "Blue STOP sits above SUS4.",
+        "Press to release all parts.",
+        "Cancels pending strum notes.",
+        "Stops and disarms the loop.",
+        "Works on every page and in EDIT.",
+        "Play a new chord to continue.",
+        "Saved chords and HOLD are kept.",
+        "Also sends MIDI All Sound Off.",
+        "Synth/effect support may vary.",
+        "Other notes on same channel stop."
+      ]
+    },
+    {
+      "title": "Momentary variations",
+      "lines": [
+        "DOM: dominant of each chord.",
+        "II: ii7 leading toward that chord.",
+        "Minor target: ii half-diminished.",
+        "SUB: tritone substitute of DOM.",
+        "BORROW: parallel major/minor.",
+        "M/m: change major/minor third.",
+        "SUS2/SUS4 replace the third.",
+        "Hold modifier, then play a chord.",
+        "Modifiers alone are silent.",
+        "Releasing prepares the next chord.",
+        "Stored steps are not modified."
+      ]
+    },
+    {
+      "title": "Lock BORROW",
+      "lines": [
+        "Shift + BORROW: lock/unlock.",
+        "Blue BORROW pad and header B: locked.",
+        "No need to keep holding BORROW.",
+        "II / DOM / SUB use borrowed targets.",
+        "Toggle is silent until next chord.",
+        "KEY and SCALE are unchanged.",
+        "STOP keeps this temporary lock.",
+        "KEEP or closing the module clears it.",
+        "Plain BORROW still works momentarily."
+      ]
+    },
+    {
+      "title": "Explore cadences",
+      "lines": [
+        "C major, G pad: II gives Am7.",
+        "Then DOM gives D7; plain gives G.",
+        "Dm pad: Em7b5, A7, then Dm.",
+        "Use one target pad throughout.",
+        "II / DOM / SUB: last held wins.",
+        "BORROW applies before these.",
+        "CHORD melody follows the result.",
+        "SCALE needs ADAPT ON to follow.",
+        "STOP releases all sounding parts."
+      ]
+    },
+    {
+      "title": "IDEAS / NEXT",
+      "lines": [
+        "Play a source chord first.",
+        "Open IDEAS; knob 1 turns it ON.",
+        "Eight chord pads become suggestions.",
+        "Display top: A5-A8; bottom: A1-A4.",
+        "Play pads to compare ideas.",
+        "All right pads stay melody.",
+        "Knob 2 STYLE: SAFE / COLOR / WILD.",
+        "SAFE: simple triads and sevenths.",
+        "COLOR: colour through ninths.",
+        "WILD: more harmonic contrast.",
+        "Approach targets stay prioritized.",
+        "White: in scale. Yellow: outside.",
+        "Knob 3 NEW: from last played chord.",
+        "Touch knobs for their functions."
+      ]
+    },
+    {
+      "title": "IDEAS / TO",
+      "lines": [
+        "Knob 4 MODE: NEXT / TO.",
+        "Play target, then enable IDEAS.",
+        "Actual played chord is captured.",
+        "Knob 1 enables the idea bank.",
+        "Major/minor: pads 1/2/3 = II/V/TGT.",
+        "COLOR/WILD: pad 4 is SUB.",
+        "Other pads: alternative connections.",
+        "SAFE keeps II/V even out of scale.",
+        "Other target types: TGT on pad 1.",
+        "Play the path yourself; no autoplay.",
+        "NEW captures the last played target.",
+        "Release pads between Bass Gestures."
+      ]
+    },
+    {
+      "title": "IDEAS / keep and return",
+      "lines": [
+        "Suggestions stay on the same pads.",
+        "NEW/STYLE refresh deliberately.",
+        "Sounding notes are not changed.",
+        "Shift + Step: save played idea.",
+        "Capture also stores ideas.",
+        "Original chord pads stay untouched.",
+        "Turn OFF or leave page to return.",
+        "Turn OFF before using EDIT.",
+        "BORROW lock refreshes ideas once.",
+        "II/DOM/SUB target the shown chord."
+      ]
+    },
+    {
+      "title": "SEQ / chord sequencer",
+      "lines": [
+        "RUN: arm or disarm progression.",
+        "RATE: duration of each step.",
+        "Always 16 steps; blanks are rests.",
+        "Empty sequence also rolls on Play.",
+        "On SEQ: hold chord + press step.",
+        "Delete + Step: clear the cell.",
+        "GATE: chord duration.",
+        "HOLD overrides gate at 100%.",
+        "PART knob 4: CHORD / BASS.",
+        "Capture button: auto-fill chords.",
+        "All 16 steps can store chords.",
+        "S.VEL (knob 5): step velocity.",
+        "Range 1-127 for preview and loop.",
+        "Shift + Step: store active chord.",
+        "Stored voicing and key stay fixed.",
+        "Global SPRD/LEAD do not change it.",
+        "Delete + Step: clear that slot.",
+        "Play arms; Shift + Play disarms."
+      ]
+    },
+    {
+      "title": "SEQ / live chord recording",
+      "lines": [
+        "Record button or knob 7 REC arms.",
+        "Move Play starts the clock.",
+        "Play chords; release to store.",
+        "RATE sets the recording grid.",
+        "Length and velocity are captured.",
+        "Only armed lane muted during REC.",
+        "Recorded span replaces its cells.",
+        "Record off resumes playback.",
+        "Hold step; LEN: 1-16 cells.",
+        "Knob 8 R.PRT: BOTH/CHORD/BASS.",
+        "Explicit LEN overrides GATE.",
+        "Later attacks interrupt long notes.",
+        "Capture is still auto-fill only."
+      ]
+    },
+    {
+      "title": "Bass Record / Step Edit",
+      "lines": [
+        "BOTH records chord and enabled bass.",
+        "Gesture changes are separate notes.",
+        "BASS knob 8: FOLLOW or CLIP.",
+        "New bass recording selects CLIP.",
+        "SEQ PART chooses editing lane.",
+        "Hold saved step: temporary editor.",
+        "Chord: ROOT / EXT / LEN / VEL.",
+        "Bass: NOTE / LEN / VEL.",
+        "Shift + NOTE: octave steps.",
+        "Release step: close editor.",
+        "Delete + Step: clear selected lane.",
+        "Bass edits silent; Play to listen.",
+        "PART does not change REC arming.",
+        "R.PRT chooses the recording part.",
+        "BASS take: pads play only roots.",
+        "Saved chords keep playing.",
+        "CHORD take: saved bass CLIP plays.",
+        "R.PRT changes finish/disarm REC.",
+        "Melody/clips are a later stage."
+      ]
+    },
+    {
+      "title": "MIDI",
+      "lines": [
+        "C.OUT / C.CH: chord route/channel.",
+        "M.OUT / M.CH: melody route/channel.",
+        "B.OUT / B.CH: bass route/channel.",
+        "A.OUT / A.CH: ARP route/channel.",
+        "Sequence normally follows C.OUT.",
+        "Legacy separate output: SEQ OUT.",
+        "No TEST or STATE controls."
+      ]
+    },
+    {
+      "title": "Theory and saving",
+      "lines": [
+        "THEORY shows sounding notes.",
+        "R: root, B: bass, T: top.",
+        "Harmony follows pads, steps, loop.",
+        "Settings are saved automatically."
+      ]
+    },
+    {
+      "title": "Clean first start",
+      "lines": [
+        "Defaults: CLOSE spread, LEAD OFF.",
+        "All 16 steps start empty.",
+        "Each new project starts clean.",
+        "Melody: SCALE, octave -1, ADAPT ON.",
+        "Existing projects keep their choices.",
+        "Return to a project to restore it.",
+        "Delete + Step clears one step.",
+        "No automatic Chord Finder import.",
+        "Older Chord Pilot state is retained."
+      ]
+    },
+    {
+      "title": "Project saving",
+      "lines": [
+        "Uses Schwung's active set ID.",
+        "Settings, pad edits and steps save.",
+        "A set switch disarms the loop.",
+        "BORROW/IDEAS latches are temporary.",
+        "WAIT: project identity unresolved.",
+        "Save pending: keep module open.",
+        "Old global data is not copied to sets."
+      ]
+    },
+    {
+      "title": "Bass walks",
+      "lines": [
+        "Enable BASS BASS first.",
+        "Shift + chord pad opens EDIT.",
+        "Knob 8: AUTO, ROOT, LOW, C-B.",
+        "Shift + knob 8: chosen bass octave.",
+        "C/B: C chord with B1 in bass.",
+        "Am with A1 makes C2-B1-A1.",
+        "Save each played chord to a step.",
+        "Stored bass stays fixed afterward.",
+        "Live KEY/ROOT transpose the bass.",
+        "Chord inversion stays independent.",
+        "AUTO returns to global bass mode."
+      ]
+    }
+  ]
+}
