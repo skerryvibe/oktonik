@@ -7,12 +7,14 @@ Play chords, melody and bass together on Ableton Move through Schwung.
 Explore harmony with your left hand, play melodies with your right, and route
 each part to a different instrument. OKTONIK generates MIDI, not audio.
 
-## Public preview 0.1.0-rc.2
+## Public preview 0.1.0-rc.4
 
 - Five pages: PLAY, CHORD, MELODY, BASS and MIDI.
 - Live Chord Map, harmonic modifiers and per-pad chord editing.
 - Adaptive melody, Bass Gesture, independent sustain and MIDI routing.
 - Simple STRUM on CHORD.
+- CHORD controls directly on PLAY, with parameter/value feedback.
+- Longer Chord Map names use two lines without shrinking the text.
 - Focused on live playing, not programming or recording chord sequences.
 
 **[Illustrated user guide](docs/oktonik-public.md)** ·
@@ -28,7 +30,7 @@ This is a release candidate; physical Move acceptance testing remains required.
 Download the Public installation archive from
 [Releases](https://github.com/skerryvibe/oktonik/releases).
 
-Upload `oktonik-public-0.1.0-rc.2.tar.gz` through Schwung at `move.local:7700`.
+Upload `oktonik-public-0.1.0-rc.4.tar.gz` through Schwung at `move.local:7700`.
 Do not extract it. Restart Move and select **OKTONIK**. Back up projects first.
 
 On first open, OKTONIK copies valid schema-7 Chord Pilot state for the same

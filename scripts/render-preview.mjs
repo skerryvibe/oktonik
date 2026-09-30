@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { renderScreen } from '../src/display.mjs';
 import { CHORD_PADS, PAGES, STOP_PAD } from '../src/pilot.mjs';
 import { createProjectPilot, ACTIVE_SET_PATH } from '../src/project.mjs';
+import { PRODUCT_VERSION } from '../src/profile.mjs';
 
 const glyphs = {
   ' ': [0,0,0,0,0,0,0], '!': [4,4,4,4,4,0,4], '#': [10,31,10,10,31,10,0],
@@ -170,6 +171,14 @@ if(publicPreview){
   const capture=(title,subtitle)=>{for(let i=0;i<70;i++)live.tick();examples.push({title,subtitle,model:live.inspect().model});};
   for(const name of ['PLAY','CHORD','MELODY','BASS','MIDI']){capture(name,'OKTONIK Public / live performance');live.changePage(1);}
   live.pad(CHORD_PADS[0],true,100,{shift:true});capture('EDIT CHORD','Shift + chord pad to open or close.');
+  if(process.env.OKTONIK_PREVIEW_MAP==='1'){
+    examples.length=0;live.selectEdit(-1);
+    live.changePage(-live.inspect().page);
+    capture('SHORT NAMES','Short chord names retain the centred single line.');
+    live.knob(2,6);capture('13TH EXTENSIONS','Long names use both lines at the original font size.');
+    live.knob(0,1);capture('ACCIDENTAL ROOTS','Root and extension split where they fit.');
+    live.pad(CHORD_PADS[0],true);capture('SELECTED CHORD','Both lines remain inside the selected-pad highlight.');
+  }
 }
 const frames = examples.map((example,index) => {
   const x = 38+(index%2)*506;
@@ -177,7 +186,7 @@ const frames = examples.map((example,index) => {
   return `<g transform="translate(${x},${y})"><text y="0" class="label">${esc(example.title)}</text><text y="24" class="caption">${esc(example.subtitle)}</text><rect x="-10" y="36" width="468" height="244" rx="12" fill="#222b2e"/><g transform="translate(0,46) scale(3.5)" shape-rendering="crispEdges">${screenSvg(example.model)}</g></g>`;
 }).join('');
 const height = 146 + Math.ceil(examples.length / 2) * 302;
-const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="${height}" viewBox="0 0 1040 ${height}"><style>text{font-family:Arial,sans-serif}.label{font-size:13px;font-weight:700;fill:#a8d6c3;letter-spacing:1.2px}.caption{font-size:14px;fill:#a4afaf}</style><rect width="1040" height="${height}" fill="#12191b"/><text x="38" y="49" fill="#eef3ee" font-size="30" font-weight="700">OKTONIK</text><text x="39" y="77" class="caption">0.1.0-rc.2 / 128 × 64 display / full-size pixel layout enlarged 3.5×</text>${frames}</svg>\n`;
+const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="${height}" viewBox="0 0 1040 ${height}"><style>text{font-family:Arial,sans-serif}.label{font-size:13px;font-weight:700;fill:#a8d6c3;letter-spacing:1.2px}.caption{font-size:14px;fill:#a4afaf}</style><rect width="1040" height="${height}" fill="#12191b"/><text x="38" y="49" fill="#eef3ee" font-size="30" font-weight="700">OKTONIK</text><text x="39" y="77" class="caption">${PRODUCT_VERSION} / 128 × 64 display / full-size pixel layout enlarged 3.5×</text>${frames}</svg>\n`;
 const destination = resolve(process.argv[2] || fileURLToPath(new URL('../docs/display-preview.svg', import.meta.url)));
 await mkdir(dirname(destination), { recursive: true });
 await writeFile(destination, svg);

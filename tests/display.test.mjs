@@ -1,6 +1,33 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { renderScreen } from '../src/display.mjs';
+import { renderScreen, chordMapLines } from '../src/display.mjs';
+
+test('chord map wraps long names at musical boundaries without dropping extensions',()=>{
+  for(const [name,lines] of [
+    ['C',['C']],['Cmaj7',['Cmaj7']],['Dbmaj7',['Db','maj7']],
+    ['Cmaj13',['C','maj13']],['Bbmadd9',['Bbm','add9']],
+    ['Cmaj7/E',['Cmaj7','/E']],['Dbmaj13/Ab',['Dbmaj','13/Ab']],
+    ['Fmaj13#11',['Fmaj','13#11']],['A(1,9,b3,5,b7)',['A','(1,9~']],
+    ['C♯maj7',['C#','maj7']],['Cmaj13(add9)/G',['Cmaj1','3(ad~']],
+  ])assert.deepEqual(chordMapLines(name),lines,name);
+});
+
+test('two-line map names stay inside cells and selected background on PLAY and IDEAS',()=>{
+  const labels=['Dbmaj7','Cmaj13','Bbmadd9','Dbmaj13/Ab','Csus4/E','Cm7','C','Cmaj13(add9)/G'];
+  for(const pageName of ['PLAY','IDEAS'])for(let selected=0;selected<8;selected++){
+    const calls=record({pageName,chordMap:{items:labels.map(label=>({label})),selected}});
+    const texts=calls.filter(c=>c.type==='text'&&c.y>=10&&c.y<53);
+    for(const c of texts){
+      assert.ok(c.w<=30);assert.ok(c.x+c.w<=Math.ceil(c.x/32)*32);
+      assert.ok(c.y+c.h<=(c.y<32?30:52));
+    }
+    const box=calls.find(c=>c.type==='fill'&&c.w===30&&c.h===18);
+    for(const c of texts.filter(c=>c.color===0)){
+      assert.ok(c.x>=box.x&&c.x+c.w<=box.x+box.w);
+      assert.ok(c.y>=box.y&&c.y+c.h<=box.y+box.h);
+    }
+  }
+});
 
 function record(model) {
   const calls = [];

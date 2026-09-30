@@ -1,12 +1,12 @@
 # OKTONIK user guide
 
 **Harmonic performance instrument · by Skerry Vibe**  
-For **0.1.0-rc.2** on Ableton Move / Schwung.
+For **0.1.0-rc.4** on Ableton Move / Schwung.
 
 One player, three musical parts: chords, melody and bass. OKTONIK generates
 MIDI notes; your Move tracks or external instruments provide the sound.
 
-[Download](https://github.com/skerryvibe/oktonik/releases/tag/v0.1.0-rc.2) ·
+[Download](https://github.com/skerryvibe/oktonik/releases/tag/v0.1.0-rc.4) ·
 [Report a bug](https://github.com/skerryvibe/oktonik/issues) · [Overview](../README.md)
 
 ## Contents
@@ -26,7 +26,7 @@ MIDI notes; your Move tracks or external instruments provide the sound.
 ## Install
 
 1. Start with a compatible Schwung installation on Move. Back up your projects.
-2. Download **oktonik-public-0.1.0-rc.2.tar.gz** from the release page.
+2. Download **oktonik-public-0.1.0-rc.4.tar.gz** from the release page.
 3. Open `move.local:7700` and upload the compressed archive through Schwung.
    Do not choose GitHub's **Source code** downloads.
 4. Restart Move and select **OKTONIK**.
@@ -116,8 +116,12 @@ Knobs 1–7: **BASS** on/off, **B.OCT**, **B.VEL**, **B.NTE**, **GEST**, **SUST*
 
 ### PLAY and MIDI
 
-PLAY shows the chord grid. Touching a knob corresponding to a grid cell reveals
-its chord label in the footer. MIDI has three route/channel pairs on knobs 1–6:
+PLAY shows the chord grid and shares all eight CHORD controls: KEY, SCALE,
+EXT, OCT, SPRD, LEAD, STRUM and SUST. Touch or turn a knob to see its parameter
+and value in the footer; after release and a short delay the map status returns.
+Long chord names use two lines at the same font size, preferably separating
+root/extension or slash bass. Short names stay on one line. Very long names
+still end in `~` when truncated. MIDI has three route/channel pairs on knobs 1–6:
 **C.OUT / C.CH**, **M.OUT / M.CH**, **B.OUT / B.CH**.
 
 ## Explore with modifiers

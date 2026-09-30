@@ -1,5 +1,5 @@
 {"title":"OKTONIK","children":[
-{"title":"Play","lines":["Harmonic performance instrument","By Skerry Vibe","Left: eight chord pads.","Right: sixteen melody pads.","Main knob / Menu: five pages.","Shift + chord pad: edit.","STOP pad: all notes off."]},
+{"title":"Play","lines":["Harmonic performance instrument","By Skerry Vibe","Left: eight chord pads.","Right: sixteen melody pads.","Main knob / Menu: five pages.","PLAY knobs match CHORD.","Touch knob: parameter + value.","Shift + chord pad: edit.","STOP pad: all notes off."]},
 {"title":"Harmony","lines":["Hold modifiers for variations.","Shift + BORROW: lock / unlock.","CHORD knob 7: simple STRUM.","Each part has separate SUST.","CC64 affects a whole channel."]},
 {"title":"Bass","lines":["Hold chord, press pad: bass root.","Release all before new chord.","MIDI routes each part separately."]},
-{"title":"Public and Lab","lines":["Public is live playing only.","IDEAS and sequencing are in Lab.","Both profiles can be installed.","Each saves independently.","Original Chord Pilot is retained."]}]}
+{"title":"Live performance","lines":["PLAY knobs 1-4:","KEY, SCALE, EXT, OCT.","PLAY knobs 5-8:","SPRD, LEAD, STRUM, SUST.","No sequencing in this preview.","Settings save per project."]}]}

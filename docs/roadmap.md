@@ -2,6 +2,47 @@
 
 ## Aktuell prioritet: Public 0.1.0
 
+- rc.3: PLAY-rattarna delar CHORD-inställningar; användaren har bekräftat att
+  genvägen fungerar bra på Move.
+- rc.4: längre ackordnamn på två rader i kartan, med bibehållen textstorlek.
+- 2026-09-30: användaren bekräftar att rc.4 fungerar bra på Move och godkänner
+  publicering på GitHub. 216 JS-tester och 45 DSP-testgrupper passerar.
+
+## Planerad uttrycksfunktion: polyfonisk aftertouch
+
+- Roadmap, inte implementerat och inget krav inför första publika släppet.
+- Börja med att verifiera padtryckets väg genom Move/Schwung till rätt MIDI-route
+  och kanal på fysisk hårdvara. Mottagande instrument måste stödja och använda signalen.
+- MELODY först: varje pads tryck följer dess faktiskt spelade ton, även när
+  ackordföljning eller adaptiv harmoni ändrar tonhöjden.
+- CHORD därefter: ackordpadens tryck skickas som polyfonisk aftertouch till
+  samtliga toner som just den paden äger, inte till övriga delar.
+- BASS ska ha separat val; ackordets tryck ska inte automatiskt påverka basen.
+  Definiera även beteendet för basvalspads under Bass Gesture innan implementation.
+- Hantera note ownership, samma ton från flera pads/delar, sustain, padsläpp,
+  omstämning, route-byte och STOP utan kvarhängande eller felriktade tryckvärden.
+- Tester för dessa övergångar samt fysisk verifiering med både synth och
+  stråkljud. Ingen full MPE-implementation krävs för polyfonisk aftertouch.
+- Håll tryck-/röstlogiken i den återanvändbara kärnan och Move-input/MIDI-utmatning
+  i adaptern, så att framtida M4L/Push-port inte kräver en ny musikalisk implementation.
+- Senare möjlighet: valbar tryckmappning till exempelvis CC1/CC11 för instrument
+  som använder dessa för uttryck. Separat från första aftertouch-etappen eftersom
+  CC påverkar hela kanalen, inte en individuell ton.
+
+## Framtida idé: stilbaserade extensions och egna harmonipresets (ej prioriterat)
+
+- Ackordbanker med olika extensions per skalsteg, inte bara en global extension.
+  Exempel: I add9 och V 13; jazz- och soul-inspirerade kombinationer som startpunkter.
+- Låt användaren redigera och spara egna kombinationer för de åtta ackordpadsen,
+  återkalla dem och transponera dem med grundtonarten.
+- Stilnamn är inspiration, inte regler för vilka ackord som är "rätt" i en genre.
+- Återanvänd per-pad edits och gemensam theory-kärna. Utred hur ett preset
+  samspelar med skala, BORROW och befintliga edits innan implementation.
+- Ett spelbart harmonipreset, inte en programmerad ackordföljd. Ingen tidsplan;
+  nuvarande fokus är stabilitet och läsbarhet i den publika live-versionen.
+
+## Public – befintlig releasegrund
+
 - Namn: OKTONIK. Slogan: Harmonic performance instrument.
 - En kodbas, två byggprofiler: Public och Lab. Beta.26-arkiven bevaras som referens.
 - Public: PLAY, CHORD, MELODY, BASS, MIDI. IDEAS finns endast i Lab.

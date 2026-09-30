@@ -743,12 +743,14 @@ export function createPilot(io = {}) {
           chord.bassMode === 'note' ? 'Bass (Shift: octave)' : 'Pad bass note'),
       ];
     }
-    const row = layout[currentPage()];
+    // Public PLAY keeps its map renderer but shares CHORD's control model.
+    // Reuse the exact controls so ranges, persistence and note handling agree.
+    const row = layout[publicBuild && currentPage() === 'PLAY' ? 'CHORDS' : currentPage()];
     return row ? Array.from({ length: 8 }, (_, i) => row[i] || blank()) : [];
   }
   function focus(index, held = true) {
     if (index < 0 || index > 7) return;
-    if (currentPage() === 'PLAY' && editIndex < 0) {
+    if (!publicBuild && currentPage() === 'PLAY' && editIndex < 0) {
       mapFocus = held ? [4,5,6,7,0,1,2,3][index] : -1;
       dirty=true; return;
     }
@@ -1045,7 +1047,8 @@ export function createPilot(io = {}) {
         : editing ? harmonyLabel(bank[editIndex], undefined, true) : harmonyLabel(active.chord, active.notes), degreeLabel: degreeName(active.chord, context()),
       transport: dsp.running ? 'PLAY' : armed ? 'WAIT' : 'OFF',
       cells: cells(), focused, detail: pageName === 'PLAY' && !editing
-        ? mapFocus >= 0 ? `PAD ${mapFocus+1}: ${map.items[mapFocus].label}`
+        ? publicBuild && (detailTicks > 0 || touch >= 0) ? detail
+          : mapFocus >= 0 ? `PAD ${mapFocus+1}: ${map.items[mapFocus].label}`
           : stopHeld ? 'STOP - all notes off' : bassGesture.inspect().active ? 'BASS | chord roots'
           : mapMode || `${noteName(settings.key)} ${(SCALES.find(s=>s.id===settings.scaleId)||SCALES[0]).short} | CHORD MAP`
         : detailTicks > 0 || touch >= 0 ? detail : defaultDetail,

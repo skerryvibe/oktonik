@@ -101,13 +101,35 @@ function renderTheory(draw, model) {
   footer(draw, model.detail || (theory.source ? `${degree || ''} ${theory.source}`.trim() : 'R:ROOT B:BASS T:TOP'));
 }
 
+// Two fixed-font lines give each pad ten characters without shrinking text.
+// Prefer musical boundaries; keep all characters when a name fits both lines.
+export function chordMapLines(value) {
+  const label = ascii(value || '--');
+  if (label.length <= 5) return [label];
+  const slash = label.indexOf('/');
+  if (slash > 0 && slash <= 5 && label.length - slash <= 5)
+    return [label.slice(0, slash), label.slice(slash)];
+  const parts = label.match(/^([A-G][b#]?(?:m(?!aj))?)(.+)$/);
+  if (parts && parts[2].length <= 5) return [parts[1], parts[2]];
+  const quality = label.match(/^([A-G][b#]?(?:maj|min|m|dim|aug|sus))(.+)$/);
+  if (quality && quality[1].length <= 5 && quality[2].length <= 5)
+    return [quality[1], quality[2]];
+  // Unrecognised voicings can be named as a long explicit interval list.
+  // Keep the root legible rather than wrapping halfway through that list.
+  if (label.length > 10 && parts?.[2].startsWith('('))
+    return [parts[1], fit(parts[2], 5)];
+  return [label.slice(0, 5), fit(label.slice(5), 5)];
+}
+
 function renderChordMap(draw, model, map) {
   // Display rows match the physical chord pads: A5-A8 above A1-A4.
   [4,5,6,7,0,1,2,3].forEach((pad, cell) => {
     const x = (cell % 4) * 32, y = cell < 4 ? 10 : 32;
     const selected = map.selected === pad;
     if (selected) draw.fill(x + 1, y + 2, 30, 18, 1);
-    draw.text(x + 1, y + 8, fit(map.items[pad]?.label || '--', 5), selected ? 0 : 1);
+    const lines = chordMapLines(map.items[pad]?.label);
+    lines.forEach((label, row) => draw.text(x + 1,
+      y + (lines.length === 1 ? 8 : 3 + row * 9), label, selected ? 0 : 1));
   });
   for (const x of [32,64,96]) draw.line(x,10,x,52,1);
   draw.line(0,31,127,31,1);

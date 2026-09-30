@@ -18,7 +18,7 @@ for(const profile of ['public','lab']) {
   const manifest=JSON.parse(readFileSync(join(root,'src/module.json'),'utf8'));
   Object.assign(manifest,{id,author:'Skerry Vibe',name:PRODUCT_NAME+(profile==='lab'?' Lab':''),abbrev:profile==='lab'?'OKTL':'OKTN',version:PRODUCT_VERSION,description:PRODUCT_TAGLINE});
   put('module.json',JSON.stringify(manifest,null,2)+'\n');
-  put('README.md',readFileSync(join(root,profile==='public'?'docs/oktonik-public.md':'README.md')));
+  put('README.md',readFileSync(join(root,profile==='public'?'docs/install-public.md':'README.md')));
   put('help.json',readFileSync(join(root,profile==='public'?'docs/help-public.json':'src/help.json')));
   put('LICENSE',readFileSync(join(root,'LICENSE')));
   put('NOTICE.md',readFileSync(join(root,'NOTICE.md')));
