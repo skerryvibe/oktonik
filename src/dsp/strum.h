@@ -17,7 +17,8 @@ static void strum_plan(const uint8_t *notes,int count,int velocity,int gap,int d
         int i=order[rank],v=velocity;
         if(rank){int spacing=gap;if(timing&&gap){spacing+=gap*((int)(strum_random(seed)%201)-100)*timing/10000;if(spacing<1)spacing=1;}time+=(unsigned)spacing;}
         if(dynamics)v+=velocity*((int)(strum_random(seed)%201)-100)*dynamics/10000;
-        if(v<1)v=1;if(v>127)v=127;
+        if(v<1)v=1;
+        if(v>127)v=127;
         delay[i]=time;velocities[i]=(uint8_t)v;
     }
 }
