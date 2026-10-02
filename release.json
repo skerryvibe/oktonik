@@ -1,6 +1,6 @@
 {
-  "version": "0.1.0-rc.4",
-  "status": "local-release-candidate",
+  "version": "0.1.0",
+  "download_url": "https://github.com/skerryvibe/oktonik/releases/download/v0.1.0/oktonik-module.tar.gz",
   "name": "OKTONIK",
-  "description": "Harmonic performance instrument"
+  "description": "Live harmonic performance: play chords, adaptive melodies and independent bass from Move's pads."
 }
