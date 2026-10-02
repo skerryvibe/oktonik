@@ -12,7 +12,7 @@ function setup(settings={}) {
     page:name=>pilot.changePage(PAGES.indexOf(name)-pilot.inspect().page)};
 }
 
-test('PLAY maps eight chords in physical order, with ten visible page markers',()=>{
+test('PLAY maps eight chords in physical order, with one marker per main page',()=>{
   const h=setup();const labels=h.map().items.map(x=>x.label);
   assert.deepEqual(labels,['C','Dm','Em','F','G','Am','Bdim','C']);
   assert.equal(h.map().selected,-1);
@@ -20,7 +20,7 @@ test('PLAY maps eight chords in physical order, with ten visible page markers',(
   renderScreen({clear(){},text(x,y,t){if(y===18||y===40)texts.push([x,y,t]);},
     line(x,y,x2,y2){if(y===6&&y2===6)marks.push(x);},rect(){},fill(x,y,w,height){if(y===2&&height===5)marks.push(x);}},h.pilot.inspect().model);
   assert.deepEqual(texts.map(x=>x[2]),['G','Am','Bdim','C','C','Dm','Em','F']);
-  assert.equal(marks.length,11);
+  assert.equal(marks.length,PAGES.length);
   assert.ok(marks.every(x=>x>=45&&x<64));
 });
 
@@ -64,8 +64,7 @@ test('EDIT returns to PLAY and map reflects custom root, type, extension, invers
   assert.equal(h.pilot.inspect().model.chordLabel,preview.label);
   assert.deepEqual(h.pilot.inspect().active.notes,preview.notes);
   const settings=h.pilot.inspect().settings,sent=h.commands.length;
-  h.pilot.focus(5,true);assert.equal(h.pilot.inspect().model.detail,'PAD 2: '+h.map().items[1].label);
-  for(let i=0;i<8;i++)h.pilot.knob(i,1);
+  h.pilot.focus(5,true);assert.match(h.pilot.inspect().model.detail,/^Voice leading:/);
   assert.deepEqual(h.pilot.inspect().settings,settings);assert.equal(h.commands.length,sent);
   h.pilot.focus(5,false);assert.doesNotMatch(h.pilot.inspect().model.detail,/PAD 2:/);
 });

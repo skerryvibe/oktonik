@@ -7,7 +7,11 @@ Play chords, melody and bass together on Ableton Move through Schwung.
 Explore harmony with your left hand, play melodies with your right, and route
 each part to a different instrument. OKTONIK generates MIDI, not audio.
 
-## Public preview 0.1.0-rc.4
+## OKTONIK 0.1.0
+
+Co-run chain editing, persistent PLAY harmony feedback, signed inversions,
+simple STRUM and opt-in melody poly aftertouch on MELODY knob 6.
+No Shift menu pages. [Installation notes](docs/install-public.md).
 
 - Five pages: PLAY, CHORD, MELODY, BASS and MIDI.
 - Live Chord Map, harmonic modifiers and per-pad chord editing.
@@ -22,15 +26,16 @@ each part to a different instrument. OKTONIK generates MIDI, not audio.
 
 ![Chords and modifiers on the left; sixteen melody pads on the right](docs/images/pad-layout.svg)
 
-Requires Move with a compatible Schwung installation and a receiving instrument.
-This is a release candidate; physical Move acceptance testing remains required.
+Requires Ableton Move, **Schwung 1.6.2 or newer**, and a receiving instrument.
+Shift + Track 1-4 opens a Schwung chain while OKTONIK pads keep playing.
+Back returns through the chain views to OKTONIK. This is a Tool, not a MIDI FX.
 
 ## Install
 
 Download the Public installation archive from
 [Releases](https://github.com/skerryvibe/oktonik/releases).
 
-Upload `oktonik-public-0.1.0-rc.4.tar.gz` through Schwung at `move.local:7700`.
+Upload `oktonik-module.tar.gz` through Schwung at `move.local:7700`.
 Do not extract it. Restart Move and select **OKTONIK**. Back up projects first.
 
 On first open, OKTONIK copies valid schema-7 Chord Pilot state for the same
@@ -58,5 +63,5 @@ GitHub: [skerryvibe/oktonik](https://github.com/skerryvibe/oktonik).
 
 We are exploring richer harmonic suggestions, expressive strum and playing
 patterns, and ways to capture musical ideas. These are not features of this
-preview and have no promised release date. The priority is a reliable,
+release and have no promised release date. The priority is a reliable,
 playable live instrument.

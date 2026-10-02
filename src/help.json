@@ -2,6 +2,61 @@
   "title": "OKTONIK Lab",
   "children": [
     {
+      "title": "Shift extra pages",
+      "lines": [
+        "Hold Shift for page extras.",
+        "PLAY / CHORDS: STRUM+.",
+        "MELODY: M.EXTR+ (TRACK, AT).",
+        "BASS: B.EXTR+ (VEL, B.VEL, SEQ).",
+        "ARP: A.CLK+ (clock and tempo).",
+        "MIDI: ENS.CH+ (voice channels).",
+        "Release Shift: return to parent.",
+        "Back also dismisses extras.",
+        "Jog stays on parent while held.",
+        "Shift+pad: EDIT still works.",
+        "Shift+Track: chain still works.",
+        "Opening extras sends no notes.",
+        "Other pages unchanged for now."
+      ]
+    },
+    {
+      "title": "Up/down chord inversions",
+      "lines": [
+        "Shift+pad: open chord EDIT.",
+        "Release Shift. Knob 4: INV.",
+        "Left from AUTO: -1 (down).",
+        "Right from AUTO: ROOT.",
+        "Turn through -2,-1,ROOT,+1,+2.",
+        "Range follows chord tone count.",
+        "Manual INV overrides LEAD.",
+        "INV: -1 / AUTO / ROOT / +1. Shift+turn: AUTO.",
+        "ROOT bass still plays the root.",
+        "LOW bass follows lowest tone.",
+        "Wide extensions may span octaves.",
+        "SHIFT+pad again exits EDIT."
+      ]
+    },
+    {
+      "title": "Divisi (Lab test)",
+      "lines": [
+        "Shift+CHORDS knob 7: DIV OFF / NOTE.",
+        "Shift+MIDI: V1.CH to V8.CH.",
+        "Each voice chooses channel 1-16.",
+        "V1 lowest, V2 next-lowest, etc.",
+        "One channel per distinct pitch.",
+        "C.CH is used only with DIV OFF.",
+        "C.OUT chooses the destination.",
+        "Receiver must split channels.",
+        "Keep other parts off these channels.",
+        "Pedal covers assigned channels.",
+        "Same channel shares expression.",
+        "Changing DIV stops live notes.",
+        "Works with strum and chord steps.",
+        "Rank allocation, not fixed voices.",
+        "Does not add chord aftertouch."
+      ]
+    },
+    {
       "title": "Timing and quantization",
       "lines": [
         "SEQ knob 6 QNT: 0-100 percent.",
@@ -40,7 +95,7 @@
     {
       "title": "Strum expression",
       "lines": [
-        "Main encoder: open STRUM page.",
+        "Hold Shift on PLAY or CHORDS.",
         "GAP: note spacing 0-100 ms.",
         "Zero: simultaneous notes.",
         "DIR: UP / DOWN / ALT / RAND.",
@@ -72,10 +127,11 @@
     {
       "title": "Bass velocity",
       "lines": [
-        "BASS knob 7 VEL: PAD / FIXED.",
+        "Hold Shift on BASS for B.EXTR+.",
+        "Knob 1 VEL: PAD / FIXED.",
         "PAD follows chord-pad attack.",
         "Gesture uses bass-selector attack.",
-        "FIXED uses knob 3 B.VEL.",
+        "FIXED uses knob 2 B.VEL.",
         "New projects start with PAD.",
         "Old projects retain FIXED.",
         "FOLLOW sequence uses B.VEL.",
@@ -90,8 +146,8 @@
         "Hold modifiers: preview instantly.",
         "Header: played chord. Grid: next.",
         "Preview never sends notes.",
-        "Touch matching knob: longer name.",
-        "Turning PLAY knobs changes nothing.",
+        "PLAY knobs share CHORDS controls.",
+        "Touch knob: parameter and value.",
         "Bass gesture: slash in header only.",
         "Shift + pad: edit; repeat to return."
       ]
@@ -135,7 +191,8 @@
     {
       "title": "ARP clock",
       "lines": [
-        "A.CLOCK knob 1: SYNC / FREE.",
+        "Hold Shift on ARP: A.CLK+.",
+        "Knob 1: SYNC / FREE.",
         "SYNC follows Move Play and tempo.",
         "FREE starts from a chord attack.",
         "Knob 2: FREE tempo 30-300 BPM.",
@@ -159,8 +216,8 @@
     {
       "title": "Pages",
       "lines": [
-        "PLAY, CHORDS, STRUM, IDEAS, MELODY,",
-        "BASS, ARP, A.CLOCK, SEQ, MIDI,",
+        "PLAY, CHORDS, IDEAS, MELODY,",
+        "BASS, ARP, SEQ, MIDI,",
         "THEORY.",
         "Main knob or Menu changes page.",
         "Touch a knob for its meaning."
@@ -175,7 +232,8 @@
         "SPRD: voicing width; starts CLOSE.",
         "LEAD: smooth changes; starts OFF.",
         "Inversion is edited per pad.",
-        "Knob 7 is unused.",
+        "Knob 7 STRUM: note spacing. Shift: DIV.",
+        "Hold Shift for strum controls.",
         "Shift + chord pad: edit that pad.",
         "OCT: chord register.",
         "SUST HOLD: ring to next chord.",
@@ -191,7 +249,9 @@
         "AUG, SUS2 or SUS4.",
         "EXT: explicit 7, MAJ7, 9 and more.",
         "INV AUTO: follow voice leading.",
-        "INV ROOT or number: fixed inversion.",
+        "INV ROOT or signed number: fixed.",
+        "Negative INV lowers upper notes.",
+        "AUTO sits between -1 and ROOT; Shift+turn also restores AUTO.",
         "SPRD: voicing width for this pad.",
         "All eight controls on one page.",
         "B.NTE: AUTO / ROOT / LOW / C-B.",
@@ -221,6 +281,7 @@
         "MODE: CHORD / SCALE / CHROM.",
         "M.OCT: melody octave.",
         "ADAPT: available in SCALE mode.",
+        "Shift+MELODY: TRACK and AT.",
         "TRACK: held notes in CHORD mode.",
         "NEAR: nearest new chord tone.",
         "PAD: fixed chord-tone position.",
@@ -238,7 +299,7 @@
         "BASS: enable automatic bass.",
         "GEST: hold chord, tap bass root.",
         "B.OCT: independent, -5 to +6.",
-        "B.VEL: bass velocity.",
+        "Shift+BASS: VEL, B.VEL, SEQ.",
         "B.NTE ROOT: chord root.",
         "B.NTE LOW: lowest voiced note.",
         "LOW follows LEAD and inversion.",
@@ -406,7 +467,7 @@
       "lines": [
         "BOTH records chord and enabled bass.",
         "Gesture changes are separate notes.",
-        "BASS knob 8: FOLLOW or CLIP.",
+        "Shift+BASS knob 3: FOLLOW / CLIP.",
         "New bass recording selects CLIP.",
         "SEQ PART chooses editing lane.",
         "Hold saved step: temporary editor.",

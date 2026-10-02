@@ -9,6 +9,8 @@ import { decodeDelta, shouldFilterMessage, setButtonLED, setLED } from '/data/Us
 import { announce } from '/data/UserData/schwung/shared/screen_reader.mjs';
 import { renderScreen } from './display.mjs';
 import { createProjectPilot } from './project.mjs';
+import { BUILD_PROFILE } from './profile.mjs';
+import { MELODY_PADS } from './pilot.mjs';
 
 function sendCommand(command) {
   const payload = JSON.stringify(command);
@@ -89,6 +91,42 @@ let shiftHeld = false;
 let deleteHeld = false;
 let pilot;
 let forceLedPaint = true;
+let chainVisit = false;
+let chainNotice = 0;
+
+// Surface sharing belongs to the Move adapter, never to the harmonic engine.
+function chainState() {
+  if (typeof shadow_corun_state !== 'function') return null;
+  try { return shadow_corun_state(); } catch (_) { return null; }
+}
+function openChain(slot) {
+  pilot.shift(false);
+  const g = globalThis;
+  const groups = ['CORUN_GRP_OLED', 'CORUN_GRP_KNOBS', 'CORUN_GRP_JOG', 'CORUN_GRP_TOUCH', 'CORUN_GRP_BACK'];
+  if (typeof g.shadow_corun_begin_cede !== 'function' || typeof g.shadow_corun_state !== 'function' ||
+      typeof g.shadow_corun_end !== 'function' || typeof g.CORUN_TARGET_CHAIN_EDIT !== 'number' ||
+      typeof g.CORUN_F_OWN_BACK !== 'number' ||
+      groups.some(key => typeof g[key] !== 'number')) {
+    chainNotice = 180; announce('Chain view needs newer Schwung'); return;
+  }
+  try {
+    // Let the peer pop its view stack; only the peer knows when it is at root.
+    g.shadow_corun_begin_cede(g.CORUN_TARGET_CHAIN_EDIT, slot, groups.reduce((mask,key)=>mask|g[key],0), g.CORUN_F_OWN_BACK);
+    const state = chainState();
+    if (!state || state.target !== g.CORUN_TARGET_CHAIN_EDIT || state.id !== slot) throw new Error('Chain view unavailable');
+    chainVisit = true; chainNotice = 0;
+    // Touch release may now belong to the editor. Clear our old touch focus.
+    for (let i=0;i<8;i++) pilot.focus(i,false);
+  } catch (_) { chainNotice = 180; announce('Cannot open chain view'); }
+}
+function reconcileChain() {
+  const state = chainState();
+  if (chainVisit && !state) {
+    chainVisit = false; forceLedPaint = true;
+    pilot.repaint(true); // no DSP reconfiguration: keep notes and clock untouched
+  }
+  return state;
+}
 
 function dspState() {
   if (typeof host_module_get_param !== 'function') return null;
@@ -117,7 +155,7 @@ globalThis.init = function init() {
     send: sendCommand,
     announce,
     moveAvailable,
-    render: model => renderScreen(draw, model),
+    render: model => { if (!chainState()) renderScreen(draw, model); },
     leds: updates => { paintLeds(updates, forceLedPaint); forceLedPaint = false; },
     forceLeds: () => { forceLedPaint = true; },
   });
@@ -126,17 +164,37 @@ globalThis.init = function init() {
 
 globalThis.tick = function tick() {
   if (!pilot) return;
+  reconcileChain();
   if (globalThis.overtakeParked) { shiftHeld = false; deleteHeld = false; }
   pilot.tick(dspState(), Boolean(globalThis.overtakeParked));
+  if (chainNotice > 0 && !globalThis.overtakeParked && !chainState()) {
+    clear_screen(); print(2,12,'Chain view unavailable',1); print(2,28,'Update Schwung',1);
+    if (--chainNotice === 0) pilot.repaint(true);
+  }
 };
 
 globalThis.onMidiMessageInternal = function onMidiMessageInternal(data) {
   if (!pilot || !data || data.length < 3) return;
+  if (globalThis.overtakeParked) return;
   const type = data[0] & 0xF0;
   const note = data[1] | 0;
   const value = data[2] | 0;
   const pressed = type === MidiNoteOn && value > 0;
   const released = type === MidiNoteOff || (type === MidiNoteOn && value === 0);
+  const chain = reconcileChain();
+  if (type === MidiCC && note >= 40 && note <= 43) {
+    // Schwung's physical order: CC43 is Track 1, CC40 is Track 4.
+    if (value > 0 && shiftHeld) openChain(43-note);
+    return;
+  }
+  // Defensive filtering: older hosts may still forward ceded knob touches.
+  if (chain && ((type === MidiCC && (note >= MoveKnob1 && note <= MoveKnob8 ||
+      note === MoveMainKnob || note === MoveMainButton)) ||
+      ((pressed || released) && note >= 0 && note < 8))) return;
+  if (chain && type === MidiCC && note === MoveBack) {
+    // A forwarded release/duplicate must not bypass the peer's navigation.
+    return;
+  }
 
   // Knob touch is a note message in the 0-7 range and is intentionally
   // handled before Schwung's noise filter.
@@ -146,6 +204,13 @@ globalThis.onMidiMessageInternal = function onMidiMessageInternal(data) {
   }
   if (type === MidiCC && note === MoveShift) {
     shiftHeld = value > 0;
+    pilot.shift(shiftHeld && !chain);
+    return;
+  }
+  // Poly pressure must be handled before Schwung's generic noise filter.
+  // Translate physical pads to logical melody inputs; the DSP owns pitches.
+  if (type === 0xA0) {
+    pilot.pressure(MELODY_PADS.indexOf(note), value);
     return;
   }
   if (shouldFilterMessage(data)) return;
@@ -173,6 +238,7 @@ globalThis.onMidiMessageInternal = function onMidiMessageInternal(data) {
     return;
   }
   if (note === MoveBack || note === MoveMenu) {
+    if (value > 0 && note === MoveBack) pilot.shift(false);
     if (value > 0 && note === MoveMenu) pilot.menu();
     return;
   }
@@ -199,5 +265,7 @@ globalThis.onResume = function onResume() {
 };
 
 globalThis.onUnload = function onUnload() {
+  if (chainVisit && typeof shadow_corun_end === 'function') shadow_corun_end();
+  chainVisit = false;
   if (pilot) pilot.unload();
 };

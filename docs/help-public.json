@@ -1,5 +1,8 @@
 {"title":"OKTONIK","children":[
-{"title":"Play","lines":["Harmonic performance instrument","By Skerry Vibe","Left: eight chord pads.","Right: sixteen melody pads.","Main knob / Menu: five pages.","PLAY knobs match CHORD.","Touch knob: parameter + value.","Shift + chord pad: edit.","STOP pad: all notes off."]},
-{"title":"Harmony","lines":["Hold modifiers for variations.","Shift + BORROW: lock / unlock.","CHORD knob 7: simple STRUM.","Each part has separate SUST.","CC64 affects a whole channel."]},
-{"title":"Bass","lines":["Hold chord, press pad: bass root.","Release all before new chord.","MIDI routes each part separately."]},
-{"title":"Live performance","lines":["PLAY knobs 1-4:","KEY, SCALE, EXT, OCT.","PLAY knobs 5-8:","SPRD, LEAD, STRUM, SUST.","No sequencing in this preview.","Settings save per project."]}]}
+{"title":"Play","lines":["Harmonic performance","instrument","By Skerry Vibe","Left: 8 chord pads.","Right: 16 melody","pads.","Main knob / Menu:","select 5 pages.","PLAY knobs match","CHORD controls.","Touch knob: shows","parameter and value.","Shift + chord pad:","edit that chord.","STOP: all notes off."]},
+{"title":"Harmony","lines":["Hold modifiers for","chord variations.","Shift + BORROW:","lock or unlock.","INV moves downward","or upward. Turn via","-1, AUTO, ROOT, +1.","Shift + turn INV:","return to AUTO.","Manual INV overrides","LEAD.","Each part has its","own SUST setting.","CC64 affects the","whole MIDI channel."]},
+{"title":"Strum","lines":["CHORD / PLAY knob 7:","note spacing in ms.","Zero: play together.","Notes strum upward.","Changes affect the","next chord attack."]},
+{"title":"Aftertouch","lines":["MELODY knob 6 AT:","OFF or POLY.","Default is OFF.","Pressure follows the","held melody note.","Your synth must use","poly aftertouch.","Not MPE; no chord","aftertouch yet."]},
+{"title":"Schwung chains","lines":["Needs Schwung 1.6.2","or newer.","Shift + Track 1-4:","open that chain.","Knobs edit the open","synth or effect.","Pads still play","OKTONIK.","Back: previous view.","Back at chain root:","return to OKTONIK.","STOP still works.","This is a Tool,","not a MIDI FX."]},
+{"title":"Bass","lines":["Hold a chord, then","press another chord","pad for its root","as the bass note.","Release all pads","before a new chord.","MIDI routes each","part separately."]},
+{"title":"Live performance","lines":["PLAY knobs 1-4:","KEY, SCALE,","EXT, OCT.","PLAY knobs 5-8:","SPRD, LEAD, STRUM,","SUST.","No sequencing in","this preview.","Settings save per","Move project."]}]}

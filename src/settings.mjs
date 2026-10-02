@@ -22,6 +22,9 @@ export function normalizeSettings(raw = {}) {
     ...harmony,
     ...strumSettings(input),
     channel: integer(input.channel ?? 0, 0, 15, 0),
+    divisi: input.divisi === true,
+    ensembleChannels: Array.from({length:8},(_,i)=>integer(Array.isArray(input.ensembleChannels)?input.ensembleChannels[i]:undefined,0,15,
+      Math.min(8,integer(input.channel??0,0,15,0))+i)),
     rate: integer(input.rate ?? 2, 0, 4, 2),
     gate: integer(input.gate ?? 85, 10, 100, 85),
     stepVelocity: integer(input.stepVelocity ?? 100, 1, 127, 100),
@@ -31,6 +34,7 @@ export function normalizeSettings(raw = {}) {
     melodyFollow: input.melodyFollow === 'pad' ? 'pad' : 'nearest',
     melodyMode: MELODY_MODES.includes(input.melodyMode) ? input.melodyMode : 'chord',
     melodyAdapt: input.melodyAdapt === true,
+    melodyAftertouch: input.melodyAftertouch === true,
     melodyOctave: integer(input.melodyOctave ?? input.octave ?? 0, -3, 3, 0),
     melodyRoute: ROUTES.includes(input.melodyRoute) ? input.melodyRoute : ROUTES.includes(input.previewRoute) ? input.previewRoute : 'move',
     melodyChannel: integer(input.melodyChannel ?? input.channel ?? 0, 0, 15, 0),
@@ -80,7 +84,7 @@ export function normalizeChord(raw) {
     degree: integer(raw.degree ?? 0, -1, 11, 0),
     source: ['diatonic', 'borrowed', 'secondary', 'approach', 'substitute', 'custom'].includes(raw.source) ? raw.source : 'diatonic',
     register: integer(raw.register ?? 0, -4, 4, 0),
-    inversion: integer(raw.inversion ?? 0, 0, 7, 0),
+    inversion: integer(raw.inversion ?? 0, -7, 7, 0),
     spread: integer(raw.spread ?? 0, 0, 2, 0),
     ...(raw.lockInversion === true ? { lockInversion: true } : {}),
     ...(['root', 'low'].includes(raw.bassMode) ? { bassMode: raw.bassMode } : {}),
@@ -106,7 +110,7 @@ export function normalizeOverride(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
   const result = {};
   for (const [key, max] of [['extension', EXTENSIONS.length - 1], ['inversion', 7], ['spread', 2], ['rootOffset', 11]]) {
-    if (Number.isInteger(raw[key]) && raw[key] >= 0 && raw[key] <= max) result[key] = raw[key];
+    if (Number.isInteger(raw[key]) && raw[key] >= (key==='inversion'?-7:0) && raw[key] <= max) result[key] = raw[key];
   }
   if (typeof raw.lockInversion === 'boolean') result.lockInversion = raw.lockInversion;
   if (['auto', 'root', 'low'].includes(raw.bassMode)) result.bassMode = raw.bassMode;

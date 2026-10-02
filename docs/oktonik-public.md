@@ -1,12 +1,12 @@
 # OKTONIK user guide
 
 **Harmonic performance instrument · by Skerry Vibe**  
-For **0.1.0-rc.4** on Ableton Move / Schwung.
+For **0.1.0** on Ableton Move / Schwung **1.6.2+**.
 
 One player, three musical parts: chords, melody and bass. OKTONIK generates
 MIDI notes; your Move tracks or external instruments provide the sound.
 
-[Download](https://github.com/skerryvibe/oktonik/releases/tag/v0.1.0-rc.4) ·
+[Published releases](https://github.com/skerryvibe/oktonik/releases) ·
 [Report a bug](https://github.com/skerryvibe/oktonik/issues) · [Overview](../README.md)
 
 ## Contents
@@ -25,8 +25,9 @@ MIDI notes; your Move tracks or external instruments provide the sound.
 
 ## Install
 
-1. Start with a compatible Schwung installation on Move. Back up your projects.
-2. Download **oktonik-public-0.1.0-rc.4.tar.gz** from the release page.
+1. Install Schwung 1.6.2 or newer on Move. Back up your projects.
+2. Download **oktonik-module.tar.gz** from the published release.
+   The manually distributed test package was named **oktonik-public-0.1.0.tar.gz**.
 3. Open `move.local:7700` and upload the compressed archive through Schwung.
    Do not choose GitHub's **Source code** downloads.
 4. Restart Move and select **OKTONIK**.
@@ -90,12 +91,31 @@ the footer. Blank cells have no control.
 | 4 | OCT | Chord register. |
 | 5 | SPRD | CLOSE, OPEN or WIDE voicing. |
 | 6 | LEAD | Automatic voice leading between chords. |
-| 7 | STRUM | Ascending spacing between chord tones, in milliseconds. Zero plays together. |
+| 7 | STRUM | Spacing between chord tones in milliseconds. Zero plays together. Direction defaults to UP. |
 | 8 | SUST | Chord sustain: OFF, HOLD or PEDAL. |
 
 Per-pad overrides can take precedence over global settings. LEAD changes the
 voicing, not the chord identity; a fixed pad inversion overrides its choice.
 STRUM here is a staggered attack, not a rhythmic pattern.
+
+STRUM is a single control: upward note spacing, without random timing or
+velocity. It affects the next chord attack. Public has no Shift menu pages.
+
+On **MELODY**, turn knob 6 **AT** to POLY to enable melody
+polyphonic aftertouch. Default is OFF. Pressure follows the held melody note
+and clears when you release it, including with sustain. The receiving synth
+must support polyphonic key pressure. This is not MPE or chord aftertouch.
+
+### Edit Schwung instruments without leaving the performance
+
+**Shift + Track 1-4** opens that Schwung chain. Knobs edit the visible synth
+or effect; OKTONIK pads continue playing. Back first returns through the
+instrument/effect views to the chain, then returns to OKTONIK. STOP remains
+available. This needs official Schwung 1.6.2+; no custom host patch is needed.
+Co-run does not make OKTONIK a chain MIDI FX module.
+
+On PLAY, the idle footer keeps the active chord and harmonic function visible.
+Parameter edits, modifier previews and STOP temporarily take priority.
 
 ### MELODY
 
@@ -197,7 +217,7 @@ register without moving chords or bass.
 | 1 | ROOT | This chord's root, relative to the global key. |
 | 2 | TYPE | Chord quality, or AUTO. |
 | 3 | EXT | This pad's extension, or AUTO. |
-| 4 | INV | AUTO lets the engine choose; ROOT or a numbered inversion fixes it. |
+| 4 | INV | Negative inversions move upper notes below the chord. Turn through -1, AUTO, ROOT, +1. Manual inversions override LEAD; Shift+turn restores AUTO. |
 | 5 | SPRD | This pad's voicing spread. |
 | 6 | KEEP | Keep the played modifier variation on its played bank pad; clears prepared modifiers and BORROW lock. |
 | 7 | RESET | Remove this pad's customisation and follow global settings. |

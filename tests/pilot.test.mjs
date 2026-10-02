@@ -23,13 +23,13 @@ test('PLAY starts with the map; HARMONY keeps eight knob positions', () => {
   pilot.init();
   assert.equal(pilot.inspect().model.pageName, 'PLAY');
   assert.equal(pilot.inspect().model.chordMap.items.length, 8);
-  assert.deepEqual(PAGES, ['PLAY', 'CHORDS', 'STRUM', 'IDEAS', 'MELODY', 'BASS', 'ARP', 'A.CLOCK', 'SEQ', 'MIDI', 'THEORY']);
+  assert.deepEqual(PAGES, ['PLAY', 'CHORDS', 'IDEAS', 'MELODY', 'BASS', 'ARP', 'SEQ', 'MIDI', 'THEORY']);
   pilot.changePage(PAGES.indexOf('CHORDS'));
   const state = pilot.inspect();
   assert.equal(state.model.pageName, 'CHORDS');
   assert.equal(state.model.cells.length, 8);
   assert.deepEqual(state.model.cells.map(cell => cell.fullLabel), [
-    'Key', 'Scale', 'Extension', 'Chord octave', 'Spread', 'Voice leading', undefined, 'Chord sustain',
+    'Key', 'Scale', 'Extension', 'Chord octave', 'Spread', 'Voice leading', 'Strum', 'Chord sustain',
   ]);
   assert.ok(frames.length >= 1);
 });

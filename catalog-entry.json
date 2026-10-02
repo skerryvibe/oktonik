@@ -1,10 +1,13 @@
 {
   "id": "oktonik",
   "name": "OKTONIK",
-  "description": "Harmonic performance instrument",
+  "description": "Live harmonic performance: play chords, adaptive melodies and independent bass from Move's pads.",
   "author": "Skerry Vibe",
   "component_type": "tool",
+  "subcategory": "performance",
+  "tags": ["chord", "bass", "polyphonic"],
   "github_repo": "skerryvibe/oktonik",
   "default_branch": "main",
-  "asset_name": "oktonik-public-0.1.0-rc.4.tar.gz"
+  "asset_name": "oktonik-module.tar.gz",
+  "min_host_version": "1.6.2"
 }

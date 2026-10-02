@@ -1,4 +1,5 @@
 import test from 'node:test';
+import {navigate} from './navigate.mjs';
 import assert from 'node:assert/strict';
 import { createPilot, PAGES, STOP_PAD, CHORD_PADS, MELODY_PADS } from '../src/pilot.mjs';
 import { STATE_PATH, encodeDocument } from '../src/settings.mjs';
@@ -10,7 +11,7 @@ function setup(settings = {}) {
     write: () => true, send: c => commands.push(c), leds: values => leds.push(values) });
   pilot.init();
   pilot.changePage(PAGES.indexOf('CHORDS'));
-  const page = name => pilot.changePage(PAGES.indexOf(name) - pilot.inspect().page);
+  const page = name => navigate(pilot,name);
   const turn = (id, delta) => {
     const index = pilot.inspect().model.cells.findIndex(c => c.id === id);
     assert.ok(index >= 0, `${id} must be visible`); pilot.knob(index, delta);
@@ -18,16 +19,16 @@ function setup(settings = {}) {
   return { pilot, commands, leds, page, turn };
 }
 
-test('each normal-page setting has a single home; unused knobs are inert', () => {
+test('settings have one home besides PLAY and the STRUM gap shortcut; unused knobs are inert', () => {
   const { pilot, page, commands } = setup();
   const ids = [];
-  for (const name of PAGES) {
+  for (const name of [...PAGES,'STRUM','M.EXTRA','B.EXTRA','A.CLOCK','ENSEMBL']) {
     page(name);
     const cells = pilot.inspect().model.cells;
     if (!['PLAY','THEORY'].includes(name)) assert.equal(cells.length, 8);
     cells.forEach((cell, i) => {
       assert.ok(cell.label.length <= 5, `${cell.label} must fit its knob cell`);
-      if (cell.id) ids.push(cell.id);
+      if (cell.id) { if (name !== 'PLAY' && !(name === 'STRUM' && cell.id === 'strumMs')) ids.push(cell.id); }
       else {
         const before = pilot.inspect().settings, sent = commands.length;
         pilot.knob(i, 1); pilot.focus(i);
@@ -50,7 +51,7 @@ test('one EDIT page holds eight controls, ignores page navigation and exits with
   assert.equal(pilot.inspect().overrides[1].extensionName, '9');
   assert.equal(pilot.inspect().overrides[1].inversion, 1);
   assert.equal(pilot.inspect().overrides[1].lockInversion, true);
-  turn('padInversion', -2);
+  pilot.knob(3,-1,{shift:true});
   assert.equal(pilot.inspect().bank[1].lockInversion, false);
   pilot.changePage(1);
   assert.equal(pilot.inspect().editIndex, 1);
@@ -83,7 +84,7 @@ test('mode-specific controls explain their availability; HOLD prevents ineffecti
   assert.match(pilot.inspect().model.detail, /SCALE/);
   turn('melodyMode', 1); turn('melodyAdapt', 1);
   assert.equal(pilot.inspect().settings.melodyAdapt, true);
-  turn('melodyFollow', -1);
+  page('M.EXTRA');turn('melodyFollow', -1);
   assert.equal(pilot.inspect().settings.melodyFollow, 'nearest');
   page('SEQ'); const gate = pilot.inspect().settings.gate;
   const text = [];

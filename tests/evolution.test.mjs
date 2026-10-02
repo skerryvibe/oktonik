@@ -184,7 +184,7 @@ test('loop notes are stable, retain custom chords, and are used for melody and d
 
 test('invalid overrides are discarded without damaging settings or valid progression', () => {
   const raw = JSON.parse(encodeDocument({}, [buildChordBank()[0]], []));
-  raw.overrides = [{ extension: 900, inversion: -1, variant: { sus: 3 } }, { extension: 4 }];
+  raw.overrides = [{ extension: 900, inversion: -8, variant: { sus: 3 } }, { extension: 4 }];
   const restored = decodeDocument(raw);
   assert.equal(restored.overrides[0], null);
   assert.equal(restored.overrides[1].extension, 4);

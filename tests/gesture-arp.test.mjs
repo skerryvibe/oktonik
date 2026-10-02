@@ -1,4 +1,5 @@
 import test from 'node:test';
+import {navigate} from './navigate.mjs';
 import assert from 'node:assert/strict';
 import { createPilot, CHORD_PADS as C, PAGES, LIVE_BASS_OWNER as B, STOP_PAD } from '../src/pilot.mjs';
 import { encodeDocument, STATE_PATH, normalizeSettings } from '../src/settings.mjs';
@@ -9,7 +10,7 @@ function setup(settings = {}) {
   const commands = [];
   const pilot = createPilot({ read: p => files.get(p), write: (p,s) => { files.set(p,s); return true; }, send: c => commands.push(c) });
   pilot.init();
-  const page = name => { pilot.selectEdit(-1); pilot.changePage(PAGES.indexOf(name) - pilot.inspect().page); };
+  const page = name => { pilot.selectEdit(-1); navigate(pilot,name); };
   const turn = (id, delta) => { const i = pilot.inspect().model.cells.findIndex(c => c.id === id); assert.ok(i >= 0, id); pilot.knob(i, delta); };
   const down = i => pilot.pad(C[i], true), up = i => pilot.pad(C[i], false);
   const bass = () => new Map(pilot.inspect().voices).get(B)?.notes[0];

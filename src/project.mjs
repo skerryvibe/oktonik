@@ -102,7 +102,7 @@ export function createProjectPilot(io = {}) {
     inspect() { const state = pilot.inspect(); return { ...state, model: decorate(state.model),
       project: project && { ...project }, projectWaiting: waiting, pendingProjectSaves: pending.size }; },
   };
-  for (const method of ['pad', 'step', 'knob', 'focus', 'changePage', 'octave', 'repaint', 'panic',
+  for (const method of ['pad', 'pressure', 'step', 'knob', 'focus', 'shift', 'changePage', 'octave', 'repaint', 'panic',
     'selectEdit', 'resetEdit', 'keepVariation', 'capture', 'record', 'undo', 'arm', 'play', 'menu']) {
     session[method] = (...args) => {
       const changed = refresh();

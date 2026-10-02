@@ -27,7 +27,8 @@ function footer(draw, value) {
 function renderHeader(draw, model) {
   const pageIndex = Number.isFinite(model.pageIndex) ? Math.max(0, model.pageIndex) : 0;
   const pageCount = Math.min(11, Math.max(1, Number(model.pageCount) || 1));
-  draw.text(1, 0, fit(model.pageName === 'ARP MIDI' ? 'A.MIDI' : model.pageName || 'HARMONY', 7), 1);
+  const title=model.extraLayer ? ({'ENSEMBL':'ENS.CH+','A.CLOCK':'A.CLK+','M.EXTRA':'M.EXTR+','B.EXTRA':'B.EXTR+'}[model.pageName] || model.pageName+'+') : model.pageName;
+  draw.text(1, 0, fit(title === 'ARP MIDI' ? 'A.MIDI' : title || 'HARMONY', 7), 1);
   // One mark per page: the selected tab is tall, the others are underlines.
   const step = model.borrowLocked ? (pageCount <= 6 ? 2 : 1) : pageCount > 10 ? 1 : pageCount > 6 ? 2 : pageCount > 4 ? 3 : 5;
   const width = model.borrowLocked ? 1 : pageCount > 6 ? 1 : pageCount > 4 ? 2 : 3;

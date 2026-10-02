@@ -1,4 +1,5 @@
 import test from 'node:test';
+import {navigate} from './navigate.mjs';
 import assert from 'node:assert/strict';
 import { createPilot, PAGES, CHORD_PADS as C, MELODY_PADS as M, STEP_OWNER_START as S, LIVE_BASS_OWNER as B } from '../src/pilot.mjs';
 import { createProjectPilot, parseProject, projectStatePath, ACTIVE_SET_PATH } from '../src/project.mjs';
@@ -14,7 +15,7 @@ function setup(settings = {}, project = false, initialId = 'set-A') {
     now: () => time, ensureDir: () => true, send: c => commands.push(c), leds: l => leds.push(l), render: m => frames.push(m),
   });
   pilot.init();
-  const page = name => pilot.changePage(PAGES.indexOf(name) - pilot.inspect().page);
+  const page = name => navigate(pilot,name);
   const turn = (id,n) => { if(id==='key') page('CHORDS'); const i = pilot.inspect().model.cells.findIndex(c => c.id === id); assert.ok(i >= 0, id); pilot.knob(i,n); };
   const advance = (ms = 600, dsp, parked) => { time += ms; pilot.tick(dsp, parked); };
   return { pilot,files,commands,leds,frames,page,turn,advance, fail: value => {fail=value;} };

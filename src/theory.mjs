@@ -86,7 +86,7 @@ export function normalizeHarmony(input = {}) {
     scaleId: SCALES.some(scale => scale.id === value.scaleId) ? value.scaleId : 'major',
     extension: integer(value.extension, 0, 0, EXTENSIONS.length - 1),
     color: integer(value.color, 0, 0, 2),
-    inversion: integer(value.inversion, 0, 0, 3),
+    inversion: integer(value.inversion, 0, -3, 3),
     spread: integer(value.spread, 0, 0, 2),
     octave: integer(value.octave, 0, -3, 3),
     strumMs: integer(value.strumMs, 0, 0, 100),
@@ -310,7 +310,7 @@ function chordData(chord) {
     ...chord,
     rootOffset: wrap(Math.trunc(chord.rootOffset)), intervals: uniqueSorted(chord.intervals),
     register: integer(chord.register, 0, -8, 8),
-    inversion: integer(chord.inversion, 0, 0, 7), spread: integer(chord.spread, 0, 0, 2),
+    inversion: integer(chord.inversion, 0, -7, 7), spread: integer(chord.spread, 0, 0, 2),
   };
 }
 
@@ -329,10 +329,20 @@ export function chordNotes(rawChord, input = {}) {
   const chord = chordData(rawChord);
   if (!chord) return [];
   const settings = normalizeHarmony(input);
-  const inversion = Math.min(chord.inversion, chord.intervals.length - 1);
-  const bass = chord.intervals[inversion];
-  let intervals = chord.intervals.map((interval, i) => i < inversion
-    ? interval + 12 * Math.max(1, Math.ceil((bass - interval) / 12)) : interval);
+  const limit = chord.intervals.length - 1;
+  const inversion = Math.max(-limit, Math.min(chord.inversion, limit));
+  let intervals;
+  if (inversion < 0) {
+    // Move the highest k tones below the remaining chord as a block. Extended
+    // voicings may span multiple octaves: retain spacing and avoid collisions.
+    const split=chord.intervals.length+inversion;
+    const shift=12*(Math.floor((chord.intervals[chord.intervals.length-1]-chord.intervals[0])/12)+1);
+    intervals=chord.intervals.map((interval,i)=>i>=split?interval-shift:interval);
+  } else {
+    const bass = chord.intervals[inversion];
+    intervals = chord.intervals.map((interval, i) => i < inversion
+      ? interval + 12 * Math.max(1, Math.ceil((bass - interval) / 12)) : interval);
+  }
   intervals.sort((a, b) => a - b);
   intervals = intervals.map((interval, i) => {
     if (chord.spread === 1 && i % 2 === 1) return interval + 12;

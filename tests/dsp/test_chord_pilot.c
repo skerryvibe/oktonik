@@ -59,6 +59,214 @@ static void state_contains(void *s,const char *text) {
     assert(plugin->get_param(s,"state",buf,sizeof(buf))>0);
     if (!strstr(buf,text)) { fprintf(stderr,"Missing %s in %s\n",text,buf); assert(0); }
 }
+static int pressure_count(int dest,int note,int amount) {
+    int n=0;
+    for(int i=0;i<event_count;i++)n+=(dest<0||events[i].dest==dest) &&
+        (events[i].bytes[1]&0xf0)==0xa0 && events[i].bytes[2]==note && events[i].bytes[3]==amount;
+    return n;
+}
+static int midi_count(int dest,int status,int note) {
+    int n=0;
+    for(int i=0;i<event_count;i++) n+=(dest<0||events[i].dest==dest) &&
+        events[i].bytes[1]==status && (note<0||events[i].bytes[2]==note);
+    return n;
+}
+static void test_divisi_routes_and_release(void) {
+    const uint8_t notes[8]={72,48,67,60,84,55,76,64};uint8_t channels[8];
+    for(int base=0;base<16;base++)for(int n=1;n<=8;n++) {
+        assert(divisi_channels(notes,n,base,1,channels)==(base+n<=16));
+        if(base+n<=16)for(int i=0;i<n;i++)for(int j=0;j<n;j++)
+            assert((channels[i]<channels[j])==(notes[i]<notes[j]));
+        assert(divisi_channels(notes,n,base,0,channels));
+        for(int i=0;i<n;i++)assert(channels[i]==base);
+    }
+    for(int route=0;route<4;route++) {
+        reset();Pilot *s=plugin->create_instance("",0);char cmd[160];
+        snprintf(cmd,sizeof(cmd),"{\"op\":\"on\",\"owner\":0,\"notes\":[67,60,64,71],\"channel\":2,\"route\":%d,\"divisi\":1}",route);
+        command(s,cmd);
+        for(int d=0;d<DESTS;d++) {
+            int want=wanted_dest(route,d);
+            assert(midi_count(d,0x92,60)==want && midi_count(d,0x93,64)==want);
+            assert(midi_count(d,0x94,67)==want && midi_count(d,0x95,71)==want);
+        }
+        command(s,"{\"op\":\"hold\",\"owner\":0}");
+        assert(count(-1,0,-1)==0);
+        command(s,"{\"op\":\"off\",\"owner\":0}");
+        for(int d=0;d<DESTS;d++) {
+            int want=wanted_dest(route,d);
+            assert(midi_count(d,0x82,60)==want && midi_count(d,0x83,64)==want);
+            assert(midi_count(d,0x84,67)==want && midi_count(d,0x85,71)==want);
+        }
+        for(int i=0;i<CELLS;i++)assert(!s->pitches[i].used);
+    }
+    groups++;
+}
+static void test_divisi_revoice_and_shared_pressure(void) {
+    reset();Pilot *s=plugin->create_instance("",0);
+    command(s,"{\"op\":\"on\",\"owner\":0,\"notes\":[60,64,67,71],\"divisi\":1,\"legato\":1}");
+    command(s,"{\"op\":\"pressure\",\"owner\":0,\"pressure\":70}");
+    assert(midi_count(MOVE,0xa3,71)==1);
+    command(s,"{\"op\":\"on\",\"owner\":8,\"notes\":[67],\"channel\":2}");
+    command(s,"{\"op\":\"pressure\",\"owner\":8,\"pressure\":90}");
+    command(s,"{\"op\":\"on\",\"owner\":0,\"notes\":[60,67,71],\"divisi\":1,\"legato\":1}");
+    assert(midi_count(MOVE,0x90,60)==1); // retained exact pitch/channel
+    assert(midi_count(MOVE,0x81,64)==1 && midi_count(MOVE,0x83,71)==1);
+    assert(midi_count(MOVE,0x91,67)==1 && midi_count(MOVE,0x92,71)==1);
+    assert(midi_count(MOVE,0x82,67)==0); // melody still owns this address
+    assert(pitch(s,MOVE,2,67,0)->pressure==90);
+    command(s,"{\"op\":\"off\",\"owner\":8}");
+    assert(midi_count(MOVE,0x82,67)==1);
+    command(s,"{\"op\":\"kill\"}");
+    for(int i=0;i<CELLS;i++)assert(!s->pitches[i].used);
+    groups++;
+}
+static void test_divisi_strum_retry_and_boundaries(void) {
+    reset();Pilot *s=plugin->create_instance("",0);
+    command(s,"{\"op\":\"on\",\"owner\":0,\"notes\":[60,64,67],\"channel\":13,\"divisi\":1,\"strum_ms\":20,\"strum_dir\":1}");
+    assert(midi_count(MOVE,0x9f,67)==1 && count(MOVE,1,-1)==1);
+    tick(s,40);tick(s,1);assert(midi_count(MOVE,0x9d,60)==1 && midi_count(MOVE,0x9e,64)==1);
+    command(s,"{\"op\":\"on\",\"owner\":0,\"notes\":[60,64,67,71],\"channel\":13,\"divisi\":1}");
+    assert(s->error && s->voices[0].count==3); // reject atomically, never wrap
+    fail_off[MOVE]=1;command(s,"{\"op\":\"off\",\"owner\":0}");
+    assert(count(MOVE,0,-1)==0);fail_off[MOVE]=0;tick(s,1);
+    assert(count(MOVE,0,-1)==3);
+    fail_on[MOVE]=1;
+    command(s,"{\"op\":\"on\",\"owner\":0,\"notes\":[60,64,67],\"channel\":8,\"divisi\":1}");
+    assert(midi_count(MOVE,0x98,60)==0);fail_on[MOVE]=0;tick(s,1);
+    assert(midi_count(MOVE,0x98,60)==1 && midi_count(MOVE,0x99,64)==1 && midi_count(MOVE,0x9a,67)==1);
+    command(s,"{\"op\":\"off\",\"owner\":0}");
+    command(s,"{\"op\":\"on\",\"owner\":0,\"notes\":[60,64,67],\"divisi\":1,\"strum_ms\":100}");
+    int ons=count(MOVE,1,-1);command(s,"{\"op\":\"kill\"}");tick(s,128);tick(s,128);
+    assert(count(MOVE,1,-1)==ons);
+    groups++;
+}
+static void test_divisi_pedal_and_sequence(void) {
+    reset();Pilot *s=plugin->create_instance("",0);
+    command(s,"{\"op\":\"pedal\",\"owner\":0,\"route\":2,\"channel\":8,\"enabled\":1,\"divisi\":1}");
+    for(int d=0;d<2;d++)for(int ch=8;ch<16;ch++)assert(s->pedal_sent[d][ch]);
+    command(s,"{\"op\":\"pedal\",\"owner\":1,\"route\":2,\"channel\":10,\"enabled\":1}");
+    command(s,"{\"op\":\"pedal\",\"owner\":0,\"route\":2,\"channel\":8,\"enabled\":0,\"divisi\":1}");
+    for(int d=0;d<2;d++)for(int ch=8;ch<16;ch++)assert(s->pedal_sent[d][ch]==(ch==10));
+    command(s,"{\"op\":\"panic\"}");
+    command(s,"{\"op\":\"config\",\"divisi\":1,\"channel\":8}");assert(s->divisi);
+    command(s,"{\"op\":\"config\",\"channel\":9}");assert(s->error && s->channel==8);
+    command(s,"{\"op\":\"slot\",\"index\":0,\"notes\":[60,64,67]}");
+    command(s,"{\"op\":\"arm\",\"enabled\":1}");clock_status=MOVE_CLOCK_STATUS_RUNNING;tick(s,1);
+    assert(midi_count(MOVE,0x98,60)==1 && midi_count(MOVE,0x99,64)==1 && midi_count(MOVE,0x9a,67)==1);
+    command(s,"{\"op\":\"config\",\"divisi\":0}");
+    assert(midi_count(MOVE,0x88,60)==1 && midi_count(MOVE,0x89,64)==1 && midi_count(MOVE,0x8a,67)==1);
+    plugin->destroy_instance(s);groups++;
+}
+static void test_pressure_routes_and_revoice(void) {
+    for(int route=0;route<4;route++) {
+        reset();void *s=plugin->create_instance("","");char cmd[160];
+        snprintf(cmd,sizeof(cmd),"{\"op\":\"on\",\"owner\":8,\"notes\":[60],\"route\":%d,\"channel\":5}",route);command(s,cmd);
+        command(s,"{\"op\":\"pressure\",\"owner\":8,\"pressure\":90}");
+        for(int d=0;d<DESTS;d++)assert(pressure_count(d,60,90)==wanted_dest(route,d));
+        for(int i=0;i<event_count;i++)if((events[i].bytes[1]&0xf0)==0xa0) {
+            assert(events[i].bytes[1]==0xa5);assert(events[i].bytes[0]==(events[i].dest==CHAIN?0x0a:0x2a));
+        }
+        snprintf(cmd,sizeof(cmd),"{\"op\":\"on\",\"owner\":8,\"notes\":[62],\"route\":%d,\"channel\":5}",route);command(s,cmd);
+        command(s,"{\"op\":\"pressure\",\"owner\":8,\"pressure\":90}");
+        for(int d=0;d<DESTS;d++)assert(pressure_count(d,60,0)==wanted_dest(route,d));
+        command(s,"{\"op\":\"kill\"}");
+        for(int d=0;d<DESTS;d++)assert(pressure_count(d,62,0)==wanted_dest(route,d));
+    }
+    groups++;
+}
+static void test_ensemble_custom_channels(void) {
+    for(int route=0;route<4;route++) {
+        reset();Pilot *s=plugin->create_instance("",0);char cmd[220];
+        snprintf(cmd,sizeof(cmd),"{\"op\":\"on\",\"owner\":0,\"notes\":[67,60,64,71],\"channel\":15,\"route\":%d,\"divisi\":1,\"channels\":[15,4,9,2,6,0,7,3]}",route);
+        command(s,cmd);assert(!s->error);
+        for(int d=0;d<DESTS;d++) {
+            int want=wanted_dest(route,d);
+            assert(midi_count(d,0x9f,60)==want && midi_count(d,0x94,64)==want);
+            assert(midi_count(d,0x99,67)==want && midi_count(d,0x92,71)==want);
+        }
+        command(s,"{\"op\":\"pressure\",\"owner\":0,\"pressure\":90}");
+        command(s,"{\"op\":\"off\",\"owner\":0}");
+        for(int d=0;d<DESTS;d++) {
+            int want=wanted_dest(route,d);
+            assert(midi_count(d,0x8f,60)==want && midi_count(d,0x84,64)==want);
+            assert(midi_count(d,0x89,67)==want && midi_count(d,0x82,71)==want);
+        }
+        for(int i=0;i<CELLS;i++)assert(!s->pitches[i].used);
+    }
+    groups++;
+}
+static void test_ensemble_pedal_remap_and_shared_channels(void) {
+    reset();Pilot *s=plugin->create_instance("",0);
+    command(s,"{\"op\":\"pedal\",\"owner\":0,\"enabled\":1,\"route\":0,\"channel\":15,\"divisi\":1,\"channels\":[15,4,4,15,4,4,15,15]}");
+    assert(!s->error);
+    for(int ch=0;ch<16;ch++)assert(s->pedal_sent[MOVE][ch]==(ch==15||ch==4));
+    assert(midi_count(MOVE,0xbf,64)==1 && midi_count(MOVE,0xb4,64)==1);
+    command(s,"{\"op\":\"on\",\"owner\":0,\"notes\":[60,64,67],\"divisi\":1,\"channels\":[15,4,4,15,4,4,15,15]}");
+    command(s,"{\"op\":\"on\",\"owner\":8,\"notes\":[64],\"channel\":4}");
+    command(s,"{\"op\":\"pedal\",\"owner\":1,\"enabled\":1,\"route\":0,\"channel\":4}");
+    command(s,"{\"op\":\"pedal\",\"owner\":0,\"enabled\":0,\"route\":0,\"channel\":15,\"divisi\":1,\"channels\":[15,4,4,15,4,4,15,15]}");
+    assert(!s->pedal_sent[MOVE][15] && s->pedal_sent[MOVE][4]);
+    command(s,"{\"op\":\"on\",\"owner\":0,\"notes\":[60,64,67],\"legato\":1,\"divisi\":1,\"channels\":[1,2,3,4,5,6,7,8]}");
+    assert(midi_count(MOVE,0x8f,60)==1 && midi_count(MOVE,0x84,67)==1 && midi_count(MOVE,0x84,64)==0);
+    assert(midi_count(MOVE,0x91,60)==1 && midi_count(MOVE,0x92,64)==1 && midi_count(MOVE,0x93,67)==1);
+    command(s,"{\"op\":\"kill\"}");for(int i=0;i<CELLS;i++)assert(!s->pitches[i].used);
+    groups++;
+}
+static void test_ensemble_validation_loop_and_retry(void) {
+    reset();Pilot *s=plugin->create_instance("",0);
+    const char *invalid[]={"[]","[1]","[0,1,2,3,4,5,6]","[0,1,2,3,4,5,6,16]","[0,1,2,3,4,5,6,-1]","[0,1,2,3,4,5,6,7,8]","[0,1,2,3,4,5,6,1.5]"};
+    for(unsigned i=0;i<sizeof(invalid)/sizeof(invalid[0]);i++) {
+        char cmd[180];snprintf(cmd,sizeof(cmd),"{\"op\":\"config\",\"divisi\":1,\"channels\":%s}",invalid[i]);
+        command(s,cmd);assert(s->error && !s->divisi);
+    }
+    command(s,"{\"op\":\"config\",\"channel\":15,\"divisi\":1,\"channels\":[15,4,9,2,6,0,7,3]}");assert(!s->error);
+    command(s,"{\"op\":\"slot\",\"index\":0,\"notes\":[60,64,67]}");
+    command(s,"{\"op\":\"arm\",\"enabled\":1}");clock_status=MOVE_CLOCK_STATUS_RUNNING;tick(s,1);
+    assert(midi_count(MOVE,0x9f,60)==1 && midi_count(MOVE,0x94,64)==1 && midi_count(MOVE,0x99,67)==1);
+    fail_off[MOVE]=1;
+    command(s,"{\"op\":\"config\",\"channels\":[1,2,3,4,5,6,7,8]}");
+    assert(midi_count(MOVE,0x8f,60)==0);fail_off[MOVE]=0;tick(s,1);
+    assert(midi_count(MOVE,0x8f,60)==1 && midi_count(MOVE,0x84,64)==1 && midi_count(MOVE,0x89,67)==1);
+    command(s,"{\"op\":\"kill\"}");for(int i=0;i<CELLS;i++)assert(!s->pitches[i].used);
+    groups++;
+}
+static void test_pressure_shared_pitch_and_hold(void) {
+    reset();Pilot *s=plugin->create_instance("","");
+    command(s,"{\"op\":\"on\",\"owner\":0,\"notes\":[60]}");
+    command(s,"{\"op\":\"on\",\"owner\":8,\"notes\":[60]}");
+    command(s,"{\"op\":\"on\",\"owner\":9,\"notes\":[60]}");
+    command(s,"{\"op\":\"pressure\",\"owner\":8,\"pressure\":40}");
+    command(s,"{\"op\":\"pressure\",\"owner\":9,\"pressure\":100}");
+    command(s,"{\"op\":\"off\",\"owner\":9}");
+    assert(pressure_count(MOVE,60,40)==2);assert(count(MOVE,0,60)==0);
+    command(s,"{\"op\":\"pressure\",\"owner\":8,\"pressure\":0}");
+    command(s,"{\"op\":\"hold\",\"owner\":8}");
+    assert(pressure_count(MOVE,60,0)==1);assert(count(MOVE,0,60)==0);
+    command(s,"{\"op\":\"off\",\"owner\":8}");assert(count(MOVE,0,60)==0);
+    // The DSP clears pressure even if a client omits the explicit reset.
+    command(s,"{\"op\":\"on\",\"owner\":8,\"notes\":[64],\"channel\":2}");
+    command(s,"{\"op\":\"pressure\",\"owner\":8,\"pressure\":70}");
+    command(s,"{\"op\":\"off\",\"owner\":8}");assert(pressure_count(MOVE,64,0)==1);
+    assert(pitch(s,MOVE,0,60,0)->refs==1);groups++;
+}
+static void test_pressure_retries_validation_and_retrigger(void) {
+    reset();Pilot *s=plugin->create_instance("","");
+    command(s,"{\"op\":\"on\",\"owner\":8,\"notes\":[60]}");
+    fail_off[MOVE]=1;
+    command(s,"{\"op\":\"pressure\",\"owner\":8,\"pressure\":20}");
+    command(s,"{\"op\":\"pressure\",\"owner\":8,\"pressure\":99}");
+    assert(pressure_count(MOVE,60,99)==0);fail_off[MOVE]=0;tick(s,1);
+    assert(pressure_count(MOVE,60,99)==1);assert(pressure_count(MOVE,60,20)==0);
+    const char *bad[]={"{\"op\":\"pressure\",\"owner\":8}","{\"op\":\"pressure\",\"pressure\":7}",
+      "{\"op\":\"pressure\",\"owner\":8,\"pressure\":128}","{\"op\":\"pressure\",\"owner\":8,\"pressure\":-1}",
+      "{\"op\":\"pressure\",\"owner\":8,\"pressure\":4,\"pressure\":5}"};
+    for(unsigned i=0;i<sizeof(bad)/sizeof(*bad);i++){command(s,bad[i]);assert(s->voices[8].pressure==99);}
+    command(s,"{\"op\":\"on\",\"owner\":9,\"notes\":[60],\"retrigger\":1}");
+    assert(pressure_count(MOVE,60,0)==1);assert(pressure_count(MOVE,60,99)==2);
+    fail_off[MOVE]=1;command(s,"{\"op\":\"off\",\"owner\":8}");command(s,"{\"op\":\"off\",\"owner\":9}");
+    assert(pitch(s,MOVE,0,60,0)!=NULL);fail_off[MOVE]=0;tick(s,1);
+    assert(pressure_count(MOVE,60,0)==2);assert(pitch(s,MOVE,0,60,0)==NULL);groups++;
+}
 static void test_shared_ownership(void) {
     void *s;
     reset(); s=plugin->create_instance("","");
@@ -842,6 +1050,7 @@ static void test_seq_unknown_transport_advancing_clock(void) {
     groups++;
 }
 int main(void) {
+    test_pressure_routes_and_revoice();test_pressure_shared_pitch_and_hold();test_pressure_retries_validation_and_retrigger();
     /* Timed events hold across empty cells, retain velocity, and preempt cleanly. */
     {
         reset();Pilot *s=plugin->create_instance("",0);clock_status=MOVE_CLOCK_STATUS_RUNNING;
@@ -1010,6 +1219,9 @@ int main(void) {
         command(s,"{\"op\":\"kill\"}");assert(!s->voices[LOOP_OWNER].count);
         plugin->destroy_instance(s);groups++;
     }
+    test_divisi_routes_and_release();test_divisi_revoice_and_shared_pressure();
+    test_ensemble_custom_channels();test_ensemble_pedal_remap_and_shared_channels();test_ensemble_validation_loop_and_retry();
+    test_divisi_strum_retry_and_boundaries();test_divisi_pedal_and_sequence();
     test_seq_unknown_transport_advancing_clock();
     test_strum_planner_variation();test_strum_directions_delivery_and_cancel();
     test_pedal_ownership_retry_and_shutdown();test_pedal_both_routing_and_panic();

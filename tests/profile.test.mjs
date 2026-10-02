@@ -5,10 +5,10 @@ import {encodeDocument,STATE_PATH,readSettings} from '../src/settings.mjs';
 import {createProjectPilot,ACTIVE_SET_PATH,projectStatePath} from '../src/project.mjs';
 import {renderScreen} from '../src/display.mjs';
 
-test('Public PLAY uses the same eight controls and MIDI behaviour as CHORD',()=>{
+for(const profile of ['public','lab'])test(`${profile} PLAY uses the same eight controls and MIDI behaviour as CHORD`,()=>{
   const expected=['key','scaleId','extension','octave','spread','voiceLead','strumMs','chordSustain'];
   for(let knob=0;knob<8;knob++){
-    const a=setup(),b=setup();b.pilot.changePage(1);
+    const a=setup(profile),b=setup(profile);b.pilot.changePage(1);
     assert.deepEqual(a.pilot.inspect().model.cells.map(c=>c.id),expected);
     for(const h of [a,b])h.pilot.pad(CHORD_PADS[0],true,90);
     for(const delta of [1,1,-1,-63,63]){
@@ -24,6 +24,19 @@ test('Public PLAY uses the same eight controls and MIDI behaviour as CHORD',()=>
   }
 });
 
+test('Lab PLAY touch holds parameter info, preserves map and returns to active harmony',()=>{
+  const {pilot,commands}=setup('lab');
+  const settle=()=>{for(let i=0;i<70;i++)pilot.tick();};settle();
+  const map=pilot.inspect().model.chordMap;const n=commands.length;
+  pilot.focus(0,true);settle();assert.equal(pilot.inspect().model.detail,'Key: C');
+  assert.equal(commands.length,n);assert.deepEqual(pilot.inspect().model.chordMap,map);
+  pilot.knob(0,1);assert.equal(pilot.inspect().model.detail,'Key: Db');
+  pilot.focus(0,false);settle();
+  const model=pilot.inspect().model;assert.equal(model.detail,`${model.chordLabel} | ${model.degreeLabel}`);
+  pilot.changePage(PAGES.indexOf('MIDI'));pilot.knob(1,63);pilot.changePage(-PAGES.indexOf('MIDI'));
+  pilot.knob(6,1);assert.equal(pilot.inspect().model.detail,'Strum: 5ms');
+});
+
 test('Public PLAY touch is silent, shows parameter/value, and returns to map footer',()=>{
   const {pilot,commands}=setup();
   const settle=()=>{for(let i=0;i<70;i++)pilot.tick();};settle();
@@ -36,7 +49,7 @@ test('Public PLAY touch is silent, shows parameter/value, and returns to map foo
   renderScreen({clear(){},line(){},rect(){},fill(){},text(x,y,t){texts.push([y,t]);}},pilot.inspect().model);
   assert.ok(texts.some(([y,t])=>y===55&&t==='Strum: 5ms'));
   assert.deepEqual(texts.filter(([y])=>y===18||y===40).map(([,t])=>t),['G','Am','Bdim','C','C','Dm','Em','F']);
-  pilot.focus(6,false);settle();assert.match(pilot.inspect().model.detail,/CHORD MAP/);
+  pilot.focus(6,false);settle();assert.equal(pilot.inspect().model.detail,`${pilot.inspect().model.chordLabel} | ${pilot.inspect().model.degreeLabel}`);
   pilot.knob(0,1);assert.equal(pilot.inspect().model.chordMap.items[0].label,'Db');
   assert.equal(pilot.inspect().model.detail,'Key: Db');
 });
@@ -76,6 +89,9 @@ test('Public keeps dormant Lab state when saving shared settings',()=>{
   const original=readSettings(()=>raw);
   const {pilot,commands,saved}=setup('public',raw);
   assert.equal(commands.find(c=>c.op==='arp').enabled,0);
+  assert.equal(pilot.inspect().settings.strumDirection,0);
+  assert.equal(pilot.inspect().settings.strumTiming,0);
+  assert.equal(pilot.inspect().settings.strumVelocity,0);
   assert.ok(!commands.some(c=>c.op==='slot'||c.op==='bassslot'));
   pilot.changePage(1);pilot.knob(0,1);pilot.unload();
   const restored=readSettings(()=>saved());

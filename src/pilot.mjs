@@ -11,7 +11,8 @@ export const CHORD_PADS = Object.freeze([68, 69, 70, 71, 76, 77, 78, 79]);
 export const MELODY_PADS = Object.freeze([72, 73, 74, 75, 80, 81, 82, 83, 88, 89, 90, 91, 96, 97, 98, 99]);
 export const MODIFIER_PADS = Object.freeze([84, 85, 86, 87, 92, 93, 94]);
 export const STOP_PAD = 95;
-export const PAGES = Object.freeze(['PLAY', 'CHORDS', 'STRUM', 'IDEAS', 'MELODY', 'BASS', 'ARP', 'A.CLOCK', 'SEQ', 'MIDI', 'THEORY']);
+export const PAGES = Object.freeze(['PLAY', 'CHORDS', 'IDEAS', 'MELODY', 'BASS', 'ARP', 'SEQ', 'MIDI', 'THEORY']);
+export const EXTRA_PAGES = Object.freeze({PLAY:'STRUM',CHORDS:'STRUM',MELODY:'M.EXTRA',BASS:'B.EXTRA',ARP:'A.CLOCK',MIDI:'ENSEMBL'});
 export const MELODY_OWNER_START = 8;
 export const STEP_OWNER_START = 24;
 export const LIVE_BASS_OWNER = STEP_OWNER_START + STEP_COUNT;
@@ -27,7 +28,9 @@ export function createPilot(io = {}) {
   const publicBuild = (io.profile ?? BUILD_PROFILE) === 'public';
   const pages = publicBuild ? PUBLIC_PAGES : PAGES;
   let ideasView = false;
-  const currentPage = () => ideasView ? 'IDEAS' : pages[page];
+  let extraHeld = false;
+  const extraPages = publicBuild ? {} : EXTRA_PAGES;
+  const currentPage = () => ideasView ? 'IDEAS' : extraHeld && editIndex<0 && stepEdit<0 ? extraPages[pages[page]] || pages[page] : pages[page];
   const send = command => io.send?.(command);
   const loaded = readSettings(io.read || (() => null));
   let settings = loaded.settings;
@@ -43,7 +46,7 @@ export function createPilot(io = {}) {
   function editedEvent(){return cellEvents((seqPart==='bass'?bassProgression:progression)[stepEdit])[stepEvent];}
   const overrides = loaded.overrides;
   let editIndex = -1, lastVoicing = [];
-  let editReturnPage = 0, mapFocus = -1;
+  let editReturnPage = 0;
   let stopHeld = false, borrowLocked = false, borrowDown = false;
   let ideasEnabled = false, ideas = [], ideasSource = null, ideaSelected = -1;
   let ideasGoal = null;
@@ -56,14 +59,14 @@ export function createPilot(io = {}) {
   const pedalParts = {chord:0,melody:1,bass:2};
   const pedalState = {};
   function pedal(part, enabled) {
-    const output=partOutput(part), key=enabled?JSON.stringify(output):'';
+    const output={...partOutput(part),...(!publicBuild && settings.divisi && part==='chord'?{divisi:1,channels:[...settings.ensembleChannels]}:{})}, key=enabled?JSON.stringify(output):'';
     if ((pedalState[part] || '')===key) return;
     pedalState[part]=key;
     send({op:'pedal',owner:pedalParts[part],enabled:+enabled,...output});
   }
   function pedalsOff() { for (const part of Object.keys(pedalParts)) pedal(part,false); }
   function sharedPedalChannel() {
-    const outputs=[['chord',settings.previewRoute,settings.channel],['melody',settings.melodyRoute,settings.melodyChannel],
+    const outputs=[...(!publicBuild&&settings.divisi?[...new Set(settings.ensembleChannels)]:[settings.channel]).map(ch=>['chord',settings.previewRoute,ch]),['melody',settings.melodyRoute,settings.melodyChannel],
       ...(settings.bassEnabled?[['bass',settings.bassRoute,settings.bassChannel]]:[]),
       ...(settings.arpEnabled?[['arp',settings.arpRoute,settings.arpChannel]]:[])];
     const dests=r=>r==='both'?['move','external']:[r];
@@ -105,7 +108,23 @@ export function createPilot(io = {}) {
   let active = { kind: 'bank', index: 0, chord: bank[0], variant: {} };
   const voices = new Map();
   const melodyHeld = Array(MELODY_PADS.length).fill(0);
-  let page = 0, focused = -1, touch = -1, detail = '', detailTicks = 0;
+  const melodyPressure = Array(MELODY_PADS.length).fill(0);
+  const sentPressure = Array(MELODY_PADS.length).fill(0);
+  function pressure(index, value) {
+    if (parked || !settings.melodyAftertouch || !Number.isInteger(index) ||
+        index < 0 || index >= melodyHeld.length || !melodyHeld[index] ||
+        !Number.isInteger(value) || value < 0 || value > 127) return;
+    melodyPressure[index] = value;
+  }
+  function flushPressure() {
+    if (parked) return;
+    melodyPressure.forEach((value,index) => {
+      if (!voices.has(index + MELODY_OWNER_START) || value === sentPressure[index]) return;
+      if (send({op:'pressure',owner:index + MELODY_OWNER_START,pressure:value}) !== false)
+        sentPressure[index] = value;
+    });
+  }
+  let page = 0, focused = -1, touch = -1, detail = '', detailTicks = 0, controlDetail = false;
   let selectedSlot = -1, capture = false, nextCapture = 0;
   let recordArmed=false;
   let takeBefore=null, undoTake=null;
@@ -220,7 +239,7 @@ export function createPilot(io = {}) {
   }
 
   function describe(text) {
-    detail = String(text); detailTicks = 65; dirty = true;
+    detail = String(text); detailTicks = 65; dirty = true; controlDetail = false;
     io.announce?.(detail);
   }
   function markSave() { dirtySave = true; saveTicks = 30; }
@@ -232,7 +251,8 @@ export function createPilot(io = {}) {
     return result;
   }
   function config() {
-    send({ op: 'config', channel: settings.channel, route: ROUTES.indexOf(settings.route),
+    send({ op: 'config', channel: settings.channel, route: ROUTES.indexOf(settings.route), divisi: !publicBuild && settings.divisi ? 1 : 0,
+      ...(!publicBuild?{channels:[...settings.ensembleChannels]}:{}),
       rate: settings.rate, gate: settings.autoSustain ? 100 : settings.gate, move_available: moveAvailable ? 1 : 0,
       legato: settings.voiceLead ? 1 : 0, bass_route: ROUTES.indexOf(settings.bassRoute),
       bass_channel: settings.bassChannel, bass_velocity: settings.bassVelocity,
@@ -277,6 +297,8 @@ export function createPilot(io = {}) {
       ...(entry?.at!==undefined?{at:entry.at,len:entry.len}:{})}));
   }
   function stop(owner) {
+    if (owner >= MELODY_OWNER_START && owner < MELODY_OWNER_START + melodyHeld.length)
+      sentPressure[owner - MELODY_OWNER_START] = 0;
     if (voices.has(owner)) { send({ op: 'off', owner }); voices.delete(owner); dirty = true; ledsDirty = true; }
   }
   function release(owner) {
@@ -312,9 +334,11 @@ export function createPilot(io = {}) {
     if (settings[partName(meta.kind)+'Sustain'] === 'pedal') pedal(partName(meta.kind),true);
     send({ op: 'on', owner, notes, velocity: clamp(Math.round(velocity), 1, 127),
       ...partOutput(meta.kind), retrigger: attack && settings.melodyRetrigger ? 1 : 0,
+      ...(!publicBuild && settings.divisi && partName(meta.kind)==='chord'?{divisi:1,channels:[...settings.ensembleChannels]}:{}),
       ...strumCommand(meta.kind === 'slot' ? meta.chord.snapshot : ['bank','idea'].includes(meta.kind) ? settings : null),
       ...(['bank', 'slot', 'idea'].includes(meta.kind) ? { legato: (meta.chord.snapshot?.voiceLead ?? settings.voiceLead) ? 1 : 0 } : {}) });
     voices.set(owner, { ...meta, sustained: false, notes: [...notes], velocity });
+    if (meta.kind === 'melody') sentPressure[meta.index] = 0;
     dirty = true; ledsDirty = true;
   }
   function revoiceMelody(octaveShift = 0, reset = false) {
@@ -394,7 +418,8 @@ export function createPilot(io = {}) {
     bassGesture.reset(); gestureBass = null;
     arpSource = '[]'; send({ op: 'arpsrc', notes: [], enabled: 0 });
     for (const owner of [...voices.keys()]) stop(owner);
-    melodyHeld.fill(0); heldModifiers.length = 0; borrowDown = false;
+    melodyHeld.fill(0); melodyPressure.fill(0); sentPressure.fill(0);
+    heldModifiers.length = 0; borrowDown = false;
     if (active.kind === 'bank') { active.variant = {}; active.chord = bank[active.index]; active.notes = chordNotes(active.chord, settings); }
     lastVoicing = []; ledsDirty = true;
   }
@@ -436,6 +461,7 @@ export function createPilot(io = {}) {
     describe(armed ? 'SEQ armed: Move Play' : 'SEQ off'); ledsDirty = true;
   }
   function selectEdit(index) {
+    extraHeld=false;
     stepEdit=-1;stepEvent=0;
     if (ideasEnabled && index >= 0) { describe('IDEAS off to edit'); return; }
     if (index < 0) setIdeas(false);
@@ -443,7 +469,7 @@ export function createPilot(io = {}) {
     if (index < 0 && editIndex >= 0) page = editReturnPage;
     editIndex = clamp(index, -1, 7);
     if (editIndex >= 0) page = pages.indexOf('CHORDS');
-    focused = -1; touch = -1; mapFocus = -1;
+    focused = -1; touch = -1;
     describe(index < 0 ? 'Editing all chords' : `Edit ${index + 1}: ${chordName(bank[index], settings)}`);
     ledsDirty = true;
   }
@@ -574,9 +600,10 @@ export function createPilot(io = {}) {
       const pitch = melodyNotes(active.chord, melodyContext())[melodyIndex];
       if (pressed && !Number.isInteger(pitch)) { describe('Note outside MIDI'); return; }
       melodyHeld[melodyIndex] = pressed ? clamp(velocity, 1, 127) : 0;
+      melodyPressure[melodyIndex] = 0;
       if (pressed) {
         play(melodyIndex + MELODY_OWNER_START, [pitch], velocity, { kind: 'melody', index: melodyIndex }, true);
-      } else release(melodyIndex + MELODY_OWNER_START);
+      } else { flushPressure(); release(melodyIndex + MELODY_OWNER_START); }
     }
   }
   function endGesture() {
@@ -626,7 +653,7 @@ export function createPilot(io = {}) {
     syncLiveBass();
     describe(`Step ${index + 1} ${chordName(active.chord, context())}`);
   }
-  // Each setting has one normal-page home. The edit screen is contextual:
+  // Each setting has one home, with PLAY aliasing CHORDS. EDIT is contextual:
   // its fields affect only the selected chord, never global key/scale.
   function cells() {
     const scale = SCALES.find(s => s.id === settings.scaleId) || SCALES[0];
@@ -657,7 +684,7 @@ export function createPilot(io = {}) {
         field('octave', 'OCT', settings.octave, 'Chord octave'),
         field('spread', 'SPRD', ['CLOSE', 'OPEN', 'WIDE'][settings.spread], 'Spread'),
         field('voiceLead', 'LEAD', settings.voiceLead ? 'ON' : 'OFF', 'Voice leading'),
-        publicBuild ? field('strumMs','STRUM',settings.strumMs,'Strum',settings.strumMs+'ms') : blank(),
+        field('strumMs','STRUM',settings.strumMs,'Strum',settings.strumMs+'ms'),
         field('chordSustain', 'SUST', settings.chordSustain.toUpperCase(), 'Chord sustain'),
       ],
       STRUM: [
@@ -665,6 +692,8 @@ export function createPilot(io = {}) {
         field('strumDirection','DIR',['UP','DOWN','ALT','RAND'][settings.strumDirection],'Strum direction'),
         field('strumTiming','TIME',settings.strumTiming+'%','Timing variation'),
         field('strumVelocity','VEL',settings.strumVelocity+'%','Velocity variation'),
+        blank(), blank(),
+        publicBuild ? blank() : field('divisi','DIV',settings.divisi?'NOTE':'OFF','Divisi',settings.divisi?'Shift+MIDI: channels':'Off'),
       ],
       IDEAS: [
         field('ideasEnabled', 'IDEAS', ideasEnabled ? 'ON' : 'OFF', 'Ideas'),
@@ -676,18 +705,27 @@ export function createPilot(io = {}) {
         field('melodyMode', 'MODE', ['CHORD', 'SCALE', 'CHROM'][MELODY_MODES.indexOf(mode)], 'Melody mode'),
         field('melodyOctave', 'M.OCT', settings.melodyOctave, 'Melody octave'),
         field('melodyAdapt', 'ADAPT', settings.melodyAdapt ? 'ON' : 'OFF', 'Adaptive scale', settings.melodyAdapt ? 'ON' : 'OFF', mode === 'scale' ? '' : 'ADAPT: use SCALE mode'),
-        field('melodyFollow', 'TRACK', settings.melodyFollow === 'nearest' ? 'NEAR' : 'PAD', 'Held melody', settings.melodyFollow === 'nearest' ? 'Nearest chord tone' : 'Pad position', mode === 'chord' ? '' : 'TRACK: use CHORD mode'),
+        publicBuild ? field('melodyFollow', 'TRACK', settings.melodyFollow === 'nearest' ? 'NEAR' : 'PAD', 'Held melody', settings.melodyFollow === 'nearest' ? 'Nearest chord tone' : 'Pad position', mode === 'chord' ? '' : 'TRACK: use CHORD mode') : blank(),
         field('melodySustain','SUST',settings.melodySustain.toUpperCase(),'Melody sustain'),
+        publicBuild ? field('melodyAftertouch','AT',settings.melodyAftertouch?'POLY':'OFF','Melody aftertouch') : blank(),
       ],
       BASS: [
         field('bassEnabled', 'BASS', settings.bassEnabled ? 'ON' : 'OFF', 'Automatic bass'),
         field('bassOctave', 'B.OCT', settings.bassOctave, 'Bass octave'),
-        field('bassVelocity', 'B.VEL', settings.bassVelocity, 'Bass velocity', settings.bassVelocity, settings.bassVelocityMode==='pad'?'VEL PAD follows attack':''),
+        publicBuild ? field('bassVelocity', 'B.VEL', settings.bassVelocity, 'Bass velocity', settings.bassVelocity, settings.bassVelocityMode==='pad'?'VEL PAD follows attack':'') : blank(),
         field('bassMode', 'B.NTE', settings.bassMode.toUpperCase(), 'Bass note'),
         field('bassGesture', 'GEST', settings.bassGesture ? 'ON' : 'OFF', 'Hold chord: bass gesture'),
         field('bassSustain','SUST',settings.bassSustain.toUpperCase(),'Bass sustain'),
+        publicBuild ? field('bassVelocityMode','VEL',settings.bassVelocityMode.toUpperCase(),'Bass velocity mode') : blank(),
+      ],
+      'M.EXTRA': [
+        publicBuild ? blank() : field('melodyFollow','TRACK',settings.melodyFollow==='nearest'?'NEAR':'PAD','Held melody',settings.melodyFollow==='nearest'?'Nearest chord tone':'Pad position',mode==='chord'?'':'TRACK: use CHORD mode'),
+        field('melodyAftertouch','AT',settings.melodyAftertouch?'POLY':'OFF','Melody aftertouch'),
+      ],
+      'B.EXTRA': [
         field('bassVelocityMode','VEL',settings.bassVelocityMode.toUpperCase(),'Bass velocity mode'),
-        publicBuild ? blank() : field('bassPlayback','SEQ',settings.bassPlayback.toUpperCase(),'Sequenced bass'),
+        field('bassVelocity','B.VEL',settings.bassVelocity,'Bass velocity',settings.bassVelocity,settings.bassVelocityMode==='pad'?'VEL PAD follows attack':''),
+        field('bassPlayback','SEQ',settings.bassPlayback.toUpperCase(),'Sequenced bass'),
       ],
       SEQ: [
         field('arm', 'RUN', dsp.running ? 'PLAY' : armed ? 'ARMED' : 'OFF', 'Loop'),
@@ -715,7 +753,7 @@ export function createPilot(io = {}) {
       ],
       MIDI: [
         field('previewRoute', 'C.OUT', routeLabels[ROUTES.indexOf(settings.previewRoute)], 'Chord output', routeFull[ROUTES.indexOf(settings.previewRoute)]),
-        field('channel', 'C.CH', settings.channel + 1, 'Chord channel'),
+        field('channel', 'C.CH', settings.channel + 1, 'Chord channel',settings.channel+1,!publicBuild&&settings.divisi?'DIV: Shift+MIDI':''),
         field('melodyRoute', 'M.OUT', routeLabels[ROUTES.indexOf(settings.melodyRoute)], 'Melody output', routeFull[ROUTES.indexOf(settings.melodyRoute)]),
         field('melodyChannel', 'M.CH', settings.melodyChannel + 1, 'Melody channel'),
         field('bassRoute', 'B.OUT', routeLabels[ROUTES.indexOf(settings.bassRoute)], 'Bass output', routeFull[ROUTES.indexOf(settings.bassRoute)]),
@@ -723,18 +761,19 @@ export function createPilot(io = {}) {
         publicBuild ? blank() : field('arpRoute', 'A.OUT', routeLabels[ROUTES.indexOf(settings.arpRoute)], 'Arp output'),
         publicBuild ? blank() : field('arpChannel', 'A.CH', settings.arpChannel + 1, 'Arp channel'),
       ],
+      ENSEMBL: settings.ensembleChannels.map((ch,i)=>field(`ensemble${i}`,`V${i+1}.CH`,ch+1,`Voice ${i+1} channel`,ch+1)),
     };
     if (editIndex >= 0) {
       const saved = overrides[editIndex] || {}, chord = bank[editIndex];
       const type = saved.chordType || 'AUTO';
       const ext = saved.extensionName || (Number.isInteger(saved.extension) ? EXTENSIONS[saved.extension] : 'AUTO');
       const inv = saved.lockInversion === true || (saved.lockInversion === undefined && chord.lockInversion)
-        ? chord.inversion : -1;
+        ? clamp(chord.inversion,1-chord.intervals.length,chord.intervals.length-1) : null;
       return [
         field('rootOffset', 'ROOT', noteName(settings.key + chord.rootOffset), 'Chord root'),
         field('chordType', 'TYPE', type, 'Chord type', type === 'AUTO' ? 'Auto: ' + chordType(chord) : type),
         field('extensionName', 'EXT', ext, 'Pad extension'),
-        field('padInversion', 'INV', inv < 0 ? 'AUTO' : inv === 0 ? 'ROOT' : inv, 'Inversion'),
+        field('padInversion', 'INV', inv === null ? 'AUTO' : inv === 0 ? 'ROOT' : inv>0?'+'+inv:inv, 'Inversion',inv===null?'AUTO':`${inv===0?'ROOT':inv>0?'+'+inv:inv} (Shift: AUTO)`),
         field('spread', 'SPRD', ['CLOSE','OPEN','WIDE'][chord.spread], 'Pad spread'),
         field('keep', 'KEEP', 'TURN', 'Keep played variation'),
         field('reset', 'RESET', 'TURN', 'Reset this pad'),
@@ -743,22 +782,19 @@ export function createPilot(io = {}) {
           chord.bassMode === 'note' ? 'Bass (Shift: octave)' : 'Pad bass note'),
       ];
     }
-    // Public PLAY keeps its map renderer but shares CHORD's control model.
+    // Both profiles keep the PLAY map but share their CHORD control model.
     // Reuse the exact controls so ranges, persistence and note handling agree.
-    const row = layout[publicBuild && currentPage() === 'PLAY' ? 'CHORDS' : currentPage()];
+    const row = layout[currentPage() === 'PLAY' ? 'CHORDS' : currentPage()];
     return row ? Array.from({ length: 8 }, (_, i) => row[i] || blank()) : [];
   }
   function focus(index, held = true) {
     if (index < 0 || index > 7) return;
-    if (!publicBuild && currentPage() === 'PLAY' && editIndex < 0) {
-      mapFocus = held ? [4,5,6,7,0,1,2,3][index] : -1;
-      dirty=true; return;
-    }
     const cell = cells()[index];
     if (!cell?.id) return;
     touch = held ? index : -1;
     focused = cell.disabled ? -1 : index;
-    describe(cell.hint || `${cell.fullLabel}: ${cell.fullValue}`);
+    describe(cell.id==='padInversion'?`INV ${cell.value} | Shift:AUTO`:cell.hint || `${cell.fullLabel}: ${cell.fullValue}`);
+    controlDetail = true;
   }
   function knob(index, delta, modifiers = {}) {
     if (parked || !delta || index < 0 || index > 7) return;
@@ -887,8 +923,12 @@ export function createPilot(io = {}) {
       const options = chordType(bank[editIndex]) === 'DIM' ? PAD_EXTENSIONS : PAD_EXTENSIONS.filter(e => e !== 'DIM7');
       value = options[clamp(Math.max(0, options.indexOf(PAD_EXTENSIONS[current])) + delta, 0, options.length - 1)];
     } else if (id === 'padInversion') {
-      const current = bank[editIndex].lockInversion ? bank[editIndex].inversion : -1;
-      value = clamp(current + delta, -1, bank[editIndex].intervals.length - 1);
+      const chord=bank[editIndex],limit=chord.intervals.length-1;
+      const current=chord.lockInversion?clamp(chord.inversion,-limit,limit):null;
+      // AUTO sits between downward inversions and manual ROOT, reachable
+      // in either direction without depending on a hardware Shift gesture.
+      const options=[...Array.from({length:limit},(_,i)=>i-limit),null,...Array.from({length:limit+1},(_,i)=>i)];
+      value=modifiers.shift?null:options[clamp(options.indexOf(current)+delta,0,options.length-1)];
     } else if (id === 'key') value = wrap(settings.key + delta, 12);
     else if (id === 'scaleId') value = SCALES[wrap(SCALES.findIndex(s => s.id === settings.scaleId) + delta, SCALES.length)].id;
     else if (id === 'extension') value = EXTENSION_ORDER[clamp(EXTENSION_ORDER.indexOf(editing.extension) + delta, 0, EXTENSION_ORDER.length - 1)];
@@ -897,7 +937,9 @@ export function createPilot(io = {}) {
     else if (id === 'arpClock') value = delta > 0 ? 'free' : 'sync';
     else if (id.endsWith('Sustain')) value = sustainModes[clamp(sustainModes.indexOf(settings[id])+delta,0,2)];
     else if (id === 'bassVelocityMode') value = delta > 0 ? 'fixed' : 'pad';
-    else if (['voiceLead', 'melodyAdapt', 'melodyRetrigger', 'autoSustain', 'bassEnabled', 'bassGesture', 'arpEnabled', 'arpHold', 'lockInversion'].includes(id)) value = delta > 0;
+    else if (id === 'divisi') value=delta>0;
+    else if (/^ensemble[0-7]$/.test(id)) value=clamp(settings.ensembleChannels[Number(id.slice(-1))]+delta,0,15);
+    else if (['voiceLead', 'melodyAdapt', 'melodyAftertouch', 'melodyRetrigger', 'autoSustain', 'bassEnabled', 'bassGesture', 'arpEnabled', 'arpHold', 'lockInversion'].includes(id)) value = delta > 0;
     else if (['route', 'previewRoute', 'melodyRoute', 'bassRoute', 'arpRoute'].includes(id)) value = ROUTES[wrap(ROUTES.indexOf(settings[id]) + delta, ROUTES.length)];
     else {
       const ranges = { color: [0, 2], inversion: [0, 3], spread: [0, 2], octave: [-3, 3],
@@ -912,15 +954,16 @@ export function createPilot(io = {}) {
     if (perPad) {
       const patch = { ...overrides[editIndex] };
       if (id === 'padInversion') {
-        patch.lockInversion = value >= 0;
-        if (value < 0) delete patch.inversion; else patch.inversion = value;
+        patch.lockInversion = value !== null;
+        if (value === null) delete patch.inversion; else patch.inversion = value;
       } else {
         patch[id] = value;
         if (id === 'extensionName') delete patch.extension;
         if (id === 'chordType' && value !== 'DIM' && patch.extensionName === 'DIM7') patch.extensionName = '7';
       }
       overrides[editIndex] = normalizeOverride(patch);
-    } else settings[id] = value;
+    } else if (/^ensemble[0-7]$/.test(id)) settings.ensembleChannels=settings.ensembleChannels.map((ch,i)=>i===Number(id.slice(-1))?value:ch);
+    else settings[id] = value;
     if(id === 'chordSustain')settings.autoSustain=value==='hold'; // legacy sequencer gate compatibility
     if (id === 'previewRoute') settings.route = settings.previewRoute;
     if (!same(before, settings) || beforeOverride !== JSON.stringify(overrides)) {
@@ -930,9 +973,10 @@ export function createPilot(io = {}) {
         for(const [owner,voice] of [...voices]) if(partName(voice.kind)===part && voice.sustained)stop(owner);
         if(value==='pedal' && [...voices.values()].some(v=>partName(v.kind)===part))pedal(part,true);
       }
-      if (id.startsWith('strum')) { /* New attacks only; never restart held notes. */ }
+      if (id === 'melodyAftertouch') { melodyPressure.fill(0); flushPressure(); }
+      else if (id.startsWith('strum')) { /* New attacks only; never restart held notes. */ }
       else if (id.startsWith('arp')) { config(); syncArp(); }
-      else if (['route', 'previewRoute', 'melodyRoute', 'bassRoute', 'channel', 'melodyChannel', 'bassChannel'].includes(id)) {
+      else if (/^ensemble[0-7]$/.test(id) || ['divisi', 'route', 'previewRoute', 'melodyRoute', 'bassRoute', 'channel', 'melodyChannel', 'bassChannel'].includes(id)) {
         clearLive(); send({ op: 'panic' }); config(); syncSlots();
       } else if (id === 'rate' || id === 'gate') config();
       else if (id === 'stepVelocity') syncSlots();
@@ -947,16 +991,25 @@ export function createPilot(io = {}) {
     }
     focused = index;
     const cell = cells()[index];
-    describe(id === 'route' && !cell.id ? 'Sequence uses C.OUT' : `${cell.fullLabel}: ${cell.fullValue}`);
+    describe(id==='padInversion'?`INV ${cell.value} | Shift:AUTO`:id === 'route' && !cell.id ? 'Sequence uses C.OUT' : `${cell.fullLabel}: ${cell.fullValue}`);
+    controlDetail = true;
+  }
+  function shift(held) {
+    if(parked && held)return;
+    const next=!!held && !!extraPages[pages[page]] && editIndex<0 && stepEdit<0 && !ideasView;
+    if(next===extraHeld)return;
+    extraHeld=next;touch=-1;focused=-1;detailTicks=0;controlDetail=false;dirty=true;
+    repaint();
   }
   function changePage(delta = 1) {
+    if(extraHeld)return; // Holding an extra layer never moves its parent tab.
     if (!Math.trunc(delta)) return;
     if (editIndex >= 0 || stepEdit>=0) return; // Contextual editors remain until release.
     ledsDirty = true;
     if (ideasView) { ideasView=false; setIdeas(false); focused=-1; touch=-1; describe('PLAY'); return; }
     const nextPage = wrap(page + Math.trunc(delta), pages.length);
     if (nextPage !== page) setIdeas(false);
-    page = nextPage; focused = -1; touch = -1; mapFocus = -1;
+    page = nextPage; focused = -1; touch = -1;
     describe(currentPage());
   }
   function octave(delta) {
@@ -1025,13 +1078,15 @@ export function createPilot(io = {}) {
     const scale = SCALES.find(s => s.id === melodyContext().scaleId) || SCALES[0];
     const pageName = currentPage();
     const defaultDetail = stepEdit>=0 ? 'Release step: back' : editIndex >= 0 ? 'Shift+pad: exit EDIT'
-      : pageName === 'CHORDS' ? 'ALL | Shift+pad: edit'
-      : pageName === 'STRUM' ? settings.strumMs ? 'Next chord attack' : 'GAP 0: simultaneous'
+      : pageName === 'CHORDS' ? publicBuild ? 'ALL | Shift+pad: edit' : 'Shift: STRUM / +pad'
+      : pageName === 'STRUM' ? 'Release Shift: back'
+      : ['M.EXTRA','B.EXTRA'].includes(pageName) ? 'Release Shift: back'
+      : pageName === 'ENSEMBL' ? new Set(settings.ensembleChannels).size<8 ? 'Shared channels' : 'V1 low -> V8 high'
       : pageName === 'IDEAS' ? ideasEnabled ? ideaSelected >= 0 ? active.ideaReason || ideas[ideaSelected]?.reason : settings.ideasMode==='to'?'TO '+chordName(ideasTarget(),settings):'FROM ' + chordName(ideasSource, settings) : 'Turn IDEAS on to try'
       : pageName === 'MELODY' ? `${noteName(harmony.key)} ${scale.short} | ${settings.melodyMode === 'scale' && settings.melodyAdapt ? 'ADAPT' : 'MELODY'}`
       : pageName === 'BASS' ? publicBuild?'GEST: hold + pad':recordArmed?'REC '+settings.recordPart.toUpperCase()+' | BASS steps':'BASS steps | hold: edit'
       : pageName === 'SEQ' ? `${(seqPart==='bass'?bassProgression:progression).filter(Boolean).length}/16 saved | ${recordArmed?(dsp.running?'REC':'REC WAIT'):dsp.running ? 'PLAY' : armed ? 'ARMED' : 'OFF'}`
-      : pageName === 'MIDI' ? sharedPedalChannel() ? 'CC64: shared channel' : 'Routes and channels'
+      : pageName === 'MIDI' ? sharedPedalChannel() ? 'CC64: shared channel' : publicBuild ? 'Routes and channels' : 'Shift: ensemble'
       : ['ARP','A.CLOCK'].includes(pageName) ? settings.arpClock === 'free' ? `FREE ${settings.arpBpm} BPM | pad` : 'SYNC | Move Play'
       : degreeName(active.chord, context());
     const editing = editIndex >= 0;
@@ -1043,21 +1098,24 @@ export function createPilot(io = {}) {
     return {
       pageName: stepEdit>=0?`${seqPart==='bass'?'B':'C'}.STP${stepEdit+1}`:editing ? `EDIT ${editIndex + 1}` : publicBuild&&pageName==='CHORDS'?'CHORD':currentPage(), pageIndex: editing || stepEdit>=0 || ideasView ? 0 : page, pageCount: editing || stepEdit>=0 || ideasView ? 1 : pages.length,
       borrowLocked,
+      extraLayer: extraHeld && !!extraPages[pages[page]] && !editing && stepEdit<0,
       chordLabel: stepEdit>=0 ? seqPart==='bass'?bassNoteName(editedEvent()?.note??0):harmonyLabel(editedEvent(),editedEvent()?.snapshot.notes,true)
         : editing ? harmonyLabel(bank[editIndex], undefined, true) : harmonyLabel(active.chord, active.notes), degreeLabel: degreeName(active.chord, context()),
       transport: dsp.running ? 'PLAY' : armed ? 'WAIT' : 'OFF',
       cells: cells(), focused, detail: pageName === 'PLAY' && !editing
-        ? publicBuild && (detailTicks > 0 || touch >= 0) ? detail
-          : mapFocus >= 0 ? `PAD ${mapFocus+1}: ${map.items[mapFocus].label}`
-          : stopHeld ? 'STOP - all notes off' : bassGesture.inspect().active ? 'BASS | chord roots'
-          : mapMode || `${noteName(settings.key)} ${(SCALES.find(s=>s.id===settings.scaleId)||SCALES[0]).short} | CHORD MAP`
+        // Derive from the active harmony, not a timed attack message: a bass
+        // selector changes the slash label without attacking another chord.
+        ? stopHeld ? 'STOP - all notes off'
+          : controlDetail && (detailTicks > 0 || touch >= 0) ? detail
+          : mapMode || `${harmonyLabel(active.chord, active.notes)} | ${degreeName(active.chord, context())}`
         : detailTicks > 0 || touch >= 0 ? detail : defaultDetail,
       ...(map ? {chordMap:map,...(pageName==='IDEAS'?{ideaView:map}:{})} : {}),
       ...(currentPage() === 'THEORY' ? { theory: { notes: sounding, root: wrap(context().key + active.chord.rootOffset, 12),
         degree: degreeName(active.chord, context()), source: active.chord.source } } : {}),
     };
   }
-  function repaint() {
+  function repaint(force = false) {
+    if (force) { dirty = true; ledsDirty = true; io.forceLeds?.(); }
     if (parked) return;
     if (dirty) { io.render?.(model()); dirty = false; }
     if (ledsDirty) { io.leds?.(ledModel()); ledsDirty = false; }
@@ -1067,10 +1125,11 @@ export function createPilot(io = {}) {
     if(recordArmed){const clock=readClock();commitTake(recorder.observe(clock.beat,clock.ready));commitBassTake(bassRecorder.observe(clock.beat,clock.ready));}
     if (isParked !== parked) {
       parked = isParked;
-      if (parked) {setRecord(false);clearLive(); setIdeas(false); stopHeld = false; save(); }
+      if (parked) {extraHeld=false;touch=-1;focused=-1;setRecord(false);clearLive(); setIdeas(false); stopHeld = false; save(); }
       else { dirty = true; ledsDirty = true; io.forceLeds?.(); }
     }
     if (nextDsp) poll(nextDsp);
+    flushPressure();
     if (saveTicks > 0 && --saveTicks === 0) save();
     if (touch < 0 && detailTicks > 0 && --detailTicks === 0) { focused = -1; dirty = true; }
     repaint();
@@ -1079,7 +1138,7 @@ export function createPilot(io = {}) {
     clearLive(); ideaSelected = -1; setArm(false); send({ op: 'kill' }); focused = -1; touch = -1; describe('STOP - all notes off');
   }
   function unload() {
-    setRecord(false);
+    shift(false);setRecord(false);
     clearLive(); armed = false; send({ op: 'arm', enabled: 0 }); send({ op: 'panic' });
     borrowLocked = false; setIdeas(false);
     for (let attempt = 0; attempt < 3 && dirtySave; attempt++) save();
@@ -1093,10 +1152,11 @@ export function createPilot(io = {}) {
     repaint();
   }
   function resume() {
+    extraHeld=false;touch=-1;focused=-1;detailTicks=0;controlDetail=false;
     config(); syncSlots(); send({ op: 'arm', enabled: armed ? 1 : 0 });
     dirty = true; ledsDirty = true; repaint();
   }
-  return { init, resume, pad, step, knob, focus, changePage, octave, tick, repaint, panic, unload, selectEdit, resetEdit, keepVariation,
+  return { init, resume, pad, pressure, step, knob, focus, shift, changePage, octave, tick, repaint, panic, unload, selectEdit, resetEdit, keepVariation,
     menu: () => {
       changePage(1);
     },

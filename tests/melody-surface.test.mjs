@@ -1,4 +1,5 @@
 import test from 'node:test';
+import {navigate} from './navigate.mjs';
 import assert from 'node:assert/strict';
 import { createPilot, CHORD_PADS as C, MELODY_PADS as M, MODIFIER_PADS as X,
   PAGES, MELODY_OWNER_START as MO, STEP_OWNER_START as SO, LIVE_BASS_OWNER as B } from '../src/pilot.mjs';
@@ -11,7 +12,7 @@ function setup(settings = {}, initialFiles) {
   const pilot = createPilot({ read: p => files.get(p), write: (p, text) => { files.set(p, text); return true; },
     send: c => commands.push(c), leds: values => { leds = values; } });
   pilot.init();
-  return { pilot, commands, files, page: name => pilot.changePage(PAGES.indexOf(name) - pilot.inspect().page),
+  return { pilot, commands, files, page: name => navigate(pilot,name),
     leds: () => { pilot.repaint(); return new Map(leds.map(led => [led.note, led.role])); } };
 }
 const voice = (pilot, owner) => new Map(pilot.inspect().voices).get(owner);
@@ -59,7 +60,7 @@ test('a played variant remains latched after modifier release and unrelated para
   page('MELODY'); pilot.knob(1, -1); page('BASS'); pilot.knob(1, 2);
   assert.deepEqual(voice(pilot, 1).notes, chord);
   assert.equal(voice(pilot, 1).sustained, true);
-  pilot.pad(X[2], true); pilot.knob(2, -10); // changing bass velocity cannot apply pending sus
+  page('B.EXTRA');pilot.knob(0,1);pilot.pad(X[2], true); pilot.knob(1, -10); // changing bass velocity cannot apply pending sus
   assert.equal(chordName(pilot.inspect().active.chord), 'A7');
   pilot.pad(X[2], false); pilot.pad(C[1], true);
   assert.equal(chordName(pilot.inspect().active.chord), 'Dm');

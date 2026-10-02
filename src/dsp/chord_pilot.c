@@ -6,18 +6,21 @@
 #include <stdio.h>
 #include <string.h>
 #include "strum.h"
+#include "divisi.h"
 
 enum { INSTANCES = 4, STEPS = 16, EVENTS = 128, CELL_TICKS=10000, LOOP_TICKS=160000, LIVE_OWNERS = 41, OWNERS = 45, LOOP_OWNER = 41, TEST_OWNER = 42, LOOP_BASS_OWNER = 43, ARP_OWNER = 44,
        NOTES = 8, CELLS = 1024, DESTS = 3, COMMAND_LIMIT = 1024 };
 enum { MOVE = 0, USB = 1, CHAIN = 2 };
 typedef struct {
     uint8_t used, dest, channel, note, velocity, sent, must_off, arp_pending;
+    uint8_t pressure, pressure_sent;
     uint16_t refs;
 } Pitch;
 typedef struct {
     uint8_t count, route, channel, velocity, notes[NOTES], assigned[NOTES], struck[NOTES], retrigger, latched;
     uint64_t due[NOTES], expires;
     uint8_t velocities[NOTES];
+    uint8_t pressure, channels[NOTES];
 } Voice;
 typedef struct { uint8_t count, notes[NOTES], velocity, strum, legato, strum_dir, strum_time, strum_vel, duration; int bass, timed, at, len; } Slot;
 typedef struct {
@@ -34,7 +37,8 @@ typedef struct {
     uint8_t pedal_want[DESTS][16], pedal_sent[DESTS][16], pedal_off[DESTS][16];
     uint64_t sample;
     uint32_t strum_seed; unsigned strum_alternate;
-    int sample_rate, route, channel, rate, gate, move_available, legato;
+    int sample_rate, route, channel, rate, gate, move_available, legato, divisi;
+    uint8_t divisi_map[NOTES]; int divisi_custom;
     int bass_route, bass_channel, bass_velocity;
     int armed, running, slot, cycle, loop_length;
     int event_slot, recording;
@@ -63,13 +67,14 @@ static const double step_beats[5] = { .25, .5, 1., 2., 4. };
 enum { F_OP, F_OWNER, F_NOTES, F_VELOCITY, F_ROUTE, F_CHANNEL,
        F_STRUM, F_INDEX, F_ENABLED, F_RATE, F_GATE, F_MOVE, F_LEGATO,
        F_RETRIGGER, F_BASS, F_BASS_ROUTE, F_BASS_CHANNEL, F_BASS_VELOCITY,
-       F_DIRECTION, F_RANGE, F_SWING, F_HOLD, F_CLOCK, F_BPM, F_STRUM_DIR, F_STRUM_TIME, F_STRUM_VEL, F_DURATION, F_BASS_CLIP, F_RECORD_PART, F_AT, F_LEN, F_COUNT };
-_Static_assert(F_COUNT<=32,"Command field mask capacity");
+       F_DIRECTION, F_RANGE, F_SWING, F_HOLD, F_CLOCK, F_BPM, F_STRUM_DIR, F_STRUM_TIME, F_STRUM_VEL, F_DURATION, F_BASS_CLIP, F_RECORD_PART, F_AT, F_LEN, F_PRESSURE, F_DIVISI, F_CHANNELS, F_COUNT };
+_Static_assert(F_COUNT<=64,"Command field mask capacity");
 typedef struct {
-    unsigned fields;
+    uint64_t fields;
     int values[F_COUNT];
     char op[12];
     uint8_t notes[NOTES];
+    uint8_t channels[NOTES];
     int count;
 } Command;
 typedef struct { const char *s; int at, length; } Reader;
@@ -127,7 +132,7 @@ static int parse_command(const char *json, Command *c) {
     static const char *keys[F_COUNT] = { "op", "owner", "notes", "velocity",
         "route", "channel", "strum_ms", "index", "enabled", "rate", "gate",
         "move_available", "legato", "retrigger", "bass", "bass_route", "bass_channel", "bass_velocity",
-        "direction", "range", "swing", "hold", "clock", "bpm", "strum_dir", "strum_time", "strum_vel", "duration", "bass_clip", "record_part", "at", "len" };
+        "direction", "range", "swing", "hold", "clock", "bpm", "strum_dir", "strum_time", "strum_vel", "duration", "bass_clip", "record_part", "at", "len", "pressure", "divisi", "channels" };
     Reader r = { json, 0, 0 };
     if (!json) return 0;
     while (r.length < COMMAND_LIMIT && json[r.length]) r.length++;
@@ -139,12 +144,20 @@ static int parse_command(const char *json, Command *c) {
         int id = -1;
         if (!read_string(&r, key, sizeof(key)) || !take(&r, ':')) return 0;
         for (int i = 0; i < F_COUNT; i++) if (!strcmp(key, keys[i])) id = i;
-        if (id < 0 || (c->fields & (1u << id))) return 0;
-        c->fields |= 1u << id;
+        if (id < 0 || (c->fields & (UINT64_C(1) << id))) return 0;
+        c->fields |= UINT64_C(1) << id;
         if (id == F_OP) {
             if (!read_string(&r, c->op, sizeof(c->op))) return 0;
         } else if (id == F_NOTES) {
             if (!read_notes(&r, c)) return 0;
+        } else if (id == F_CHANNELS) {
+            if (!take(&r,'[')) return 0;
+            for(int i=0;i<NOTES;i++) {
+                int ch;
+                if((i && !take(&r,',')) || !read_int(&r,&ch) || ch<0 || ch>15) return 0;
+                c->channels[i]=(uint8_t)ch;
+            }
+            if(!take(&r,']'))return 0;
         } else if (!read_int(&r, &c->values[id])) return 0;
         if (take(&r, '}')) {
             whitespace(&r);
@@ -154,28 +167,30 @@ static int parse_command(const char *json, Command *c) {
     }
     return 0;
 }
-static int has(const Command *c, int field) { return !!(c->fields & (1u << field)); }
+static int has(const Command *c, int field) { return !!(c->fields & (UINT64_C(1) << field)); }
 static int value(const Command *c, int field, int fallback) {
     return has(c, field) ? c->values[field] : fallback;
 }
 static int valid_command(const Command *c) {
     static const int minima[F_COUNT] = {0,0,0,1,0,0,0,0,0,0,10,0,0,0,-1,0,0,1,0,1,0,0,0,30};
-    static const int maxima[F_COUNT] = {0,LIVE_OWNERS-1,0,127,3,15,100,EVENTS-1,1,4,100,1,1,1,127,3,15,127,4,4,50,1,1,300,3,100,100,16,1,2,LOOP_TICKS-1,LOOP_TICKS};
+    static const int maxima[F_COUNT] = {0,LIVE_OWNERS-1,0,127,3,15,100,EVENTS-1,1,4,100,1,1,1,127,3,15,127,4,4,50,1,1,300,3,100,100,16,1,2,LOOP_TICKS-1,LOOP_TICKS,127,1};
     if(has(c,F_AT)!=has(c,F_LEN) || (has(c,F_LEN)&&!c->values[F_LEN]))return 0;
     if((!strcmp(c->op,"slot")||!strcmp(c->op,"bassslot")) && c->count && c->values[F_INDEX]>=STEPS && !has(c,F_AT))return 0;
     for (int i = F_OWNER; i < F_COUNT; i++)
-        if (i != F_NOTES && has(c, i) &&
+        if (i != F_NOTES && i != F_CHANNELS && has(c, i) &&
             (c->values[i] < minima[i] || c->values[i] > maxima[i])) return 0;
     if (!strcmp(c->op, "on")) return has(c,F_OWNER) && has(c,F_NOTES) && c->count;
     if (!strcmp(c->op, "off")) return has(c,F_OWNER);
     if (!strcmp(c->op, "hold")) return has(c,F_OWNER);
+    if (!strcmp(c->op, "pressure")) return has(c,F_OWNER) && has(c,F_PRESSURE);
     if (!strcmp(c->op, "slot")) return has(c,F_INDEX) && has(c,F_NOTES);
     if (!strcmp(c->op, "bassslot")) return has(c,F_INDEX) && has(c,F_NOTES) && c->count<=1;
     if (!strcmp(c->op, "arm")) return has(c,F_ENABLED);
     if (!strcmp(c->op, "record")) return has(c,F_ENABLED);
     if (!strcmp(c->op, "arpsrc")) return has(c,F_NOTES);
     if (!strcmp(c->op, "arp")) return 1;
-    if (!strcmp(c->op,"pedal")) return has(c,F_OWNER) && c->values[F_OWNER]<3 && has(c,F_ROUTE) && has(c,F_CHANNEL) && has(c,F_ENABLED);
+    if (!strcmp(c->op,"pedal")) return has(c,F_OWNER) && c->values[F_OWNER]<3 && has(c,F_ROUTE) && has(c,F_CHANNEL) && has(c,F_ENABLED) &&
+        (!value(c,F_DIVISI,0) || (c->values[F_OWNER]==0 && (has(c,F_CHANNELS) || c->values[F_CHANNEL]<=16-NOTES)));
     return !strcmp(c->op,"config") || !strcmp(c->op,"cleargrid") || !strcmp(c->op,"panic") || !strcmp(c->op,"kill") || !strcmp(c->op,"test") || !strcmp(c->op,"arptest");
 }
 
@@ -242,11 +257,38 @@ static int wanted_dest(int route, int dest) {
            (dest == USB && (route == 1 || route == 2)) ||
            (dest == CHAIN && route == 3);
 }
+/* Shared MIDI pitch/channel has one pressure value: strongest live owner wins.
+ * Recompute only pitches touched by a changed owner, not a frame-wide scan. */
+static void set_pressure(Pilot *s, int owner, int amount) {
+    Voice *v = &s->voices[owner];
+    if (v->pressure == amount) return;
+    v->pressure = (uint8_t)amount;
+    for (int n=0;n<v->count;n++) for (int d=0;d<DESTS;d++) if (v->assigned[n] & (1u<<d)) {
+        Pitch *p = pitch(s,d,v->channels[n],v->notes[n],0);
+        if (!p) continue;
+        int maximum = 0;
+        for (int o=0;o<OWNERS;o++) {
+            Voice *other = &s->voices[o];
+            if (other->pressure <= maximum) continue;
+            for (int k=0;k<other->count;k++)
+                if (other->channels[k]==p->channel && other->notes[k]==p->note && (other->assigned[k] & (1u<<d))) maximum=other->pressure;
+        }
+        p->pressure = (uint8_t)maximum;
+    }
+}
+static int send_pressure(Pilot *s, Pitch *p, int amount) {
+    uint8_t packet[4] = {(uint8_t)((p->dest==CHAIN?0:0x20)|0x0a),
+        (uint8_t)(0xa0|p->channel),p->note,(uint8_t)amount};
+    if (!send_packet(s,p->dest,packet)) return 0;
+    p->pressure_sent = (uint8_t)amount;
+    return 1;
+}
 static void release_voice(Pilot *s, int owner) {
     Voice *v = &s->voices[owner];
+    set_pressure(s,owner,0);
     for (int i = 0; i < v->count; i++) {
         for (int d = 0; d < DESTS; d++) if (v->assigned[i] & (1u << d)) {
-            Pitch *p = pitch(s,d,v->channel,v->notes[i],0);
+            Pitch *p = pitch(s,d,v->channels[i],v->notes[i],0);
             if (p && p->refs) {
                 p->refs--;
                 if (!p->refs && p->sent) p->must_off = 1;
@@ -260,10 +302,16 @@ static void reconcile(Pilot *s) {
     for (int i = 0; i < CELLS; i++) {
         Pitch *p = &s->pitches[i];
         if (!p->used) continue;
+        // Reset before off/retrigger, including tails held by a receiver pedal.
+        // On congestion retain the pending reset and retry before reattack.
+        if (p->sent && (p->must_off || !p->refs) && p->pressure_sent &&
+            !send_pressure(s,p,0)) continue;
         if (p->sent && (p->must_off || !p->refs) && send_note(s,p,0)) {
             p->sent = 0; p->must_off = 0;
         }
-        if (!p->refs && !p->sent) p->used = 0;
+        // Reset even after note-off: a pedal/release tail may still sound.
+        if (!p->refs && p->pressure_sent) send_pressure(s,p,0);
+        if (!p->refs && !p->sent && !p->pressure_sent) p->used = 0;
     }
     service_kill(s);
     for (int d=0;d<DESTS;d++) for(int ch=0;ch<16;ch++) {
@@ -289,6 +337,8 @@ static void reconcile(Pilot *s) {
             !s->kill_pending[p->dest][p->channel] && !s->pedal_off[p->dest][p->channel] &&
             (!s->pedal_want[p->dest][p->channel] || s->pedal_sent[p->dest][p->channel]) && send_note(s,p,1))
             p->sent = 1;
+        if (p->used && p->sent && p->refs && !p->must_off &&
+            p->pressure != p->pressure_sent) send_pressure(s,p,p->pressure);
     }
 }
 static void service_voices(Pilot *s) {
@@ -302,12 +352,13 @@ static void service_voices(Pilot *s) {
                     continue;
                 if ((v->assigned[n] & (1u << d)) && (!v->retrigger || (v->struck[n] & (1u << d))))
                     continue;
-                p = pitch(s,d,v->channel,v->notes[n],1);
+                p = pitch(s,d,v->channels[n],v->notes[n],1);
                 if (!p) { s->error = "MIDI voice capacity reached"; continue; }
                 if (owner == ARP_OWNER || owner == TEST_OWNER) p->arp_pending = 1;
                 if (!(v->assigned[n] & (1u << d))) {
                     p->refs++; p->velocity = v->velocities[n];
                     v->assigned[n] |= (uint8_t)(1u << d);
+                    if (v->pressure > p->pressure) p->pressure = v->pressure;
                 }
                 if (v->retrigger && !(v->struck[n] & (1u << d))) {
                     /* One off/on cycle per destination for a deliberate new
@@ -324,13 +375,17 @@ static void service_voices(Pilot *s) {
 }
 static void start_pattern(Pilot *s, int owner, const uint8_t *notes, int count,
                         int velocity, int route, int channel, int strum, int duration_ms, int retrigger,
-                        int direction,int timing,int dynamics) {
+                        int direction,int timing,int dynamics,int divisi,const uint8_t *channel_map) {
     Voice *v;
     uint8_t retained[NOTES] = {0};
+    uint8_t channels[NOTES];
+    if (!divisi_channels(notes,count,divisi&&channel_map?0:channel,divisi,channels)) { s->error="Divisi channel range"; return; }
+    if(divisi && channel_map)for(int i=0;i<count;i++)channels[i]=channel_map[channels[i]];
     v = &s->voices[owner];
+    set_pressure(s,owner,0);
     if (s->legato && owner != TEST_OWNER && v->channel == channel && v->route == route) {
         for (int i = 0; i < count; i++) for (int j = 0; j < v->count; j++) {
-            if (notes[i] == v->notes[j]) {
+            if (notes[i] == v->notes[j] && channels[i] == v->channels[j]) {
                 retained[i] = v->assigned[j];
                 /* Transfer existing references, without an off/on pair. */
                 v->assigned[j] = 0;
@@ -348,6 +403,7 @@ static void start_pattern(Pilot *s, int owner, const uint8_t *notes, int count,
     if(strum && count>1 && direction==2)s->strum_alternate++;
     for (int i = 0; i < count; i++) {
         v->notes[i] = notes[i];
+        v->channels[i] = channels[i];
         v->assigned[i] = retained[i];
         v->due[i] = s->sample + (uint64_t)delays[i] * (unsigned)s->sample_rate / 1000;
     }
@@ -355,7 +411,7 @@ static void start_pattern(Pilot *s, int owner, const uint8_t *notes, int count,
     service_voices(s);
 }
 static void start_voice(Pilot *s,int owner,const uint8_t *notes,int count,int velocity,int route,int channel,int strum,int duration_ms,int retrigger) {
-    start_pattern(s,owner,notes,count,velocity,route,channel,strum,duration_ms,retrigger,0,0,0);
+    start_pattern(s,owner,notes,count,velocity,route,channel,strum,duration_ms,retrigger,0,0,0,0,0);
 }
 static void panic(Pilot *s) {
     for(int d=0;d<DESTS;d++) for(int ch=0;ch<16;ch++) {
@@ -385,7 +441,7 @@ static void start_loop_bass(Pilot *s, Slot *slot) {
 static void start_loop(Pilot *s, Slot *slot) {
     int live_legato = s->legato;
     s->legato = slot->legato;
-    if(!(s->recording&1))start_pattern(s,LOOP_OWNER,slot->notes,slot->count,slot->velocity,s->route,s->channel,slot->strum,0,0,slot->strum_dir,slot->strum_time,slot->strum_vel);
+    if(!(s->recording&1))start_pattern(s,LOOP_OWNER,slot->notes,slot->count,slot->velocity,s->route,s->channel,slot->strum,0,0,slot->strum_dir,slot->strum_time,slot->strum_vel,s->divisi,s->divisi_custom?s->divisi_map:0);
     start_loop_bass(s,slot);
     s->legato = live_legato;
 }
@@ -584,7 +640,12 @@ static void set_param(void *instance, const char *key, const char *json) {
         const int bit=1<<c.values[F_OWNER];
         for(int d=0;d<DESTS;d++) for(int ch=0;ch<16;ch++) {
             int want=s->pedal_want[d][ch]&~bit;
-            if(c.values[F_ENABLED] && ch==c.values[F_CHANNEL] && wanted_dest(c.values[F_ROUTE],d) && supports(s,d))want|=bit;
+            int selected=ch==c.values[F_CHANNEL];
+            if(value(&c,F_DIVISI,0)) {
+                selected=0;
+                for(int i=0;i<NOTES;i++)selected|=ch==(has(&c,F_CHANNELS)?c.channels[i]:c.values[F_CHANNEL]+i);
+            }
+            if(c.values[F_ENABLED] && selected && wanted_dest(c.values[F_ROUTE],d) && supports(s,d))want|=bit;
             if(!want && s->pedal_sent[d][ch])s->pedal_off[d][ch]=1;
             s->pedal_want[d][ch]=(uint8_t)want;
         }
@@ -611,8 +672,13 @@ static void set_param(void *instance, const char *key, const char *json) {
         }
     } else if (!strcmp(c.op,"config")) {
         int route = value(&c,F_ROUTE,s->route), channel = value(&c,F_CHANNEL,s->channel);
+        int divisi=value(&c,F_DIVISI,s->divisi);
+        int map_changed=has(&c,F_CHANNELS) && (!s->divisi_custom || memcmp(s->divisi_map,c.channels,NOTES));
+        if(divisi && !has(&c,F_CHANNELS) && !s->divisi_custom && channel>16-NOTES) {s->error="Divisi channel range";return;}
         int available = value(&c,F_MOVE,s->move_available), rate = value(&c,F_RATE,s->rate);
-        if (route != s->route || channel != s->channel || available != s->move_available) panic(s);
+        if (route != s->route || channel != s->channel || available != s->move_available || divisi != s->divisi || (divisi && map_changed)) panic(s);
+        if(has(&c,F_CHANNELS)){memcpy(s->divisi_map,c.channels,NOTES);s->divisi_custom=1;}
+        s->divisi=divisi;
         if (rate != s->rate) stop_loop(s);
         s->route = route; s->channel = channel; s->move_available = available;
         s->rate = rate; s->gate = value(&c,F_GATE,s->gate);
@@ -630,8 +696,11 @@ static void set_param(void *instance, const char *key, const char *json) {
         s->legato = value(&c,F_LEGATO,s->legato);
         start_pattern(s,c.values[F_OWNER],c.notes,c.count,value(&c,F_VELOCITY,100),
                     value(&c,F_ROUTE,s->route),value(&c,F_CHANNEL,s->channel),value(&c,F_STRUM,0),0,value(&c,F_RETRIGGER,0),
-                    value(&c,F_STRUM_DIR,0),value(&c,F_STRUM_TIME,0),value(&c,F_STRUM_VEL,0));
+                    value(&c,F_STRUM_DIR,0),value(&c,F_STRUM_TIME,0),value(&c,F_STRUM_VEL,0),value(&c,F_DIVISI,0),has(&c,F_CHANNELS)?c.channels:0);
         s->legato = live_legato;
+    } else if (!strcmp(c.op,"pressure")) {
+        if (s->voices[c.values[F_OWNER]].count)
+            set_pressure(s,c.values[F_OWNER],c.values[F_PRESSURE]);
     } else if (!strcmp(c.op,"off")) {
         release_voice(s,c.values[F_OWNER]);
     } else if (!strcmp(c.op,"hold")) {
@@ -704,7 +773,7 @@ static int voice_sounding(Pilot *s, int owner) {
     Voice *v = &s->voices[owner];
     for (int i = 0; i < v->count; i++) for (int d = 0; d < DESTS; d++) {
         if (v->assigned[i] & (1u << d)) {
-            Pitch *p = pitch(s,d,v->channel,v->notes[i],0);
+            Pitch *p = pitch(s,d,v->channels[i],v->notes[i],0);
             if (p && p->sent) return 1;
         }
     }

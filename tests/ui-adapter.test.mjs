@@ -15,7 +15,7 @@ function host(profile='lab') {
     MovePlay: 85, MoveBack: 51, MoveMenu: 50, MoveMainButton: 3,
     MoveMainKnob: 14, MoveUp: 55, MoveDown: 54, MoveKnob1: 71, MoveKnob2: 72, MoveKnob8: 78,
     MoveStep1: 16, MoveStep16: 31, MovePads: Array.from({ length: 32 }, (_, i) => 68 + i) };
-  const context = { ...constants, Black: 0, BrightGreen: 1, Purple: 2, RoyalBlue: 3,
+  const context = { ...constants, MELODY_PADS, BUILD_PROFILE: profile, Black: 0, BrightGreen: 1, Purple: 2, RoyalBlue: 3,
     VividYellow: 4, White: 5, LightGrey: 6, WhiteLedBright: 127, WhiteLedDim: 20,
     decodeDelta: n => n < 64 ? n : n - 128, shouldFilterMessage: () => false,
     setLED: (...args) => ledCalls.push(args), setButtonLED: (...args) => ledCalls.push(args),
@@ -34,6 +34,142 @@ function host(profile='lab') {
     cc: (key, value) => send(176, constants[key], value),
     down: note => send(144, note, 100), up: note => send(128, note, 0) };
 }
+
+test('physical knob 7 is STRUM normally and DIV only on the Shift layer',()=>{
+  const h=host();
+  for(const page of ['PLAY','CHORDS']) {
+    h.pilot.changePage(PAGES.indexOf(page)-h.pilot.inspect().page);
+    const before=h.pilot.inspect().settings.strumMs;
+    h.context.onMidiMessageInternal([176,77,1]);
+    assert.equal(h.pilot.inspect().settings.strumMs,before+5);
+    assert.equal(h.pilot.inspect().settings.divisi,false);
+    h.cc('MoveShift',127);h.context.onMidiMessageInternal([176,77,1]);
+    assert.equal(h.pilot.inspect().settings.divisi,true);
+    assert.equal(h.pilot.inspect().settings.strumMs,before+5);
+    h.context.onMidiMessageInternal([176,77,127]);h.cc('MoveShift',0);
+    assert.equal(h.pilot.inspect().settings.divisi,false);
+    assert.equal(h.pilot.inspect().model.pageName,page);
+  }
+});
+test('physical Shift extras return to their parent; Back and chain entry dismiss them without notes',()=>{
+  const h=host();h.commands.length=0;
+  h.cc('MoveShift',127);assert.equal(h.pilot.inspect().model.pageName,'STRUM');
+  h.cc('MoveKnob1',1);assert.equal(h.pilot.inspect().settings.strumMs,5);
+  assert.equal(h.pilot.inspect().settings.key,0);
+  h.cc('MoveMainKnob',1);assert.equal(h.pilot.inspect().page,0);
+  h.cc('MoveShift',0);assert.equal(h.pilot.inspect().model.pageName,'PLAY');
+  h.pilot.changePage(PAGES.indexOf('MIDI'));h.cc('MoveShift',127);
+  assert.equal(h.pilot.inspect().model.pageName,'ENSEMBL');h.cc('MoveKnob1',1);
+  assert.equal(h.pilot.inspect().settings.ensembleChannels[0],1);
+  h.cc('MoveBack',127);assert.equal(h.pilot.inspect().model.pageName,'MIDI');
+  h.cc('MoveShift',0);h.cc('MoveShift',127);const c=withChain(h);
+  h.context.onMidiMessageInternal([176,43,127]);assert.equal(c.calls.length,1);
+  assert.equal(h.pilot.inspect().model.extraLayer,false);h.cc('MoveShift',0);
+  c.close();h.context.tick();assert.equal(h.pilot.inspect().model.pageName,'MIDI');
+  assert.ok(!h.commands.some(c=>c.op==='on'));
+});
+
+test('physical EDIT inversion turns downward and Shift+INV restores AUTO without opening extras',()=>{
+  const h=host();h.cc('MoveShift',127);h.down(68);h.up(68);h.cc('MoveShift',0);
+  assert.equal(h.pilot.inspect().model.pageName,'EDIT 1');
+  h.context.onMidiMessageInternal([176,74,127]); // knob 4, -1
+  assert.equal(h.pilot.inspect().model.cells[3].value,'-1');
+  assert.equal(h.pilot.inspect().bank[0].lockInversion,true);
+  assert.ok(h.pilot.inspect().model.detail.length<=21);
+  for(const [delta,label] of [[1,'AUTO'],[1,'ROOT'],[127,'AUTO'],[127,'-1']]) {
+    h.context.onMidiMessageInternal([176,74,delta]);
+    assert.equal(h.pilot.inspect().model.cells[3].value,label);
+    assert.equal(h.pilot.inspect().bank[0].lockInversion,label!=='AUTO');
+  }
+  h.cc('MoveShift',127);h.context.onMidiMessageInternal([176,74,1]);h.cc('MoveShift',0);
+  assert.equal(h.pilot.inspect().model.cells[3].value,'AUTO');
+  assert.equal(h.pilot.inspect().model.pageName,'EDIT 1');
+  assert.equal(h.pilot.inspect().settings.key,0);
+});
+
+function withChain(h) {
+  let state=null;
+  const calls=[];
+  Object.assign(h.context,{
+    CORUN_TARGET_CHAIN_EDIT:1,CORUN_GRP_OLED:1,CORUN_GRP_KNOBS:2,CORUN_GRP_JOG:4,CORUN_GRP_TOUCH:8,
+    CORUN_GRP_BACK:16,CORUN_F_OWN_BACK:32,
+    shadow_corun_state:()=>state,
+    shadow_corun_begin_cede:(target,id,mask,flags)=>{calls.push({target,id,mask,flags});state={target,id};},
+    shadow_corun_end:()=>{state=null;},
+  });
+  return {calls,close:()=>{state=null;}};
+}
+
+for(const profile of ['lab','public'])test(`${profile} physical aftertouch works in co-run and maps only melody pads`,()=>{
+  const h=host(profile);withChain(h);
+  h.pilot.changePage(profile==='public'?2:PAGES.indexOf('MELODY'));
+  if(profile==='public')h.context.onMidiMessageInternal([176,76,1]);
+  else {h.cc('MoveShift',127);h.cc('MoveKnob2',1);h.cc('MoveShift',0);}
+  h.down(72);
+  h.cc('MoveShift',127);h.context.onMidiMessageInternal([176,42,127]);h.cc('MoveShift',0);
+  h.context.shouldFilterMessage=()=>true;
+  for(const note of [72,68,16,0])h.context.onMidiMessageInternal([0xa3,note,95]);
+  h.context.tick();
+  assert.deepEqual(h.commands.filter(c=>c.op==='pressure'),[{op:'pressure',owner:8,pressure:95}]);
+  h.context.overtakeParked=true;h.context.tick();const n=h.commands.length;
+  h.context.onMidiMessageInternal([0xa0,72,100]);h.context.tick();
+  assert.equal(h.commands.slice(n).filter(c=>c.op==='pressure').length,0);
+});
+
+test('Lab and Public Shift+Track address all four chains',()=>{
+  for(const profile of ['lab','public']){
+    const h=host(profile),c=withChain(h);
+    h.context.onMidiMessageInternal([176,42,127]);assert.equal(c.calls.length,0);
+    h.cc('MoveShift',127);
+    for(let slot=0;slot<4;slot++)h.context.onMidiMessageInternal([176,43-slot,127]);
+    assert.deepEqual(c.calls,[0,1,2,3].map(id=>({target:1,id,mask:31,flags:32})));
+  }
+});
+
+for(const profile of ['lab','public'])test(`${profile} co-run keeps notes, isolates controls and redraws after Back`,()=>{
+  const h=host(profile),c=withChain(h);h.down(68);h.down(72);
+  const settings=JSON.stringify(h.pilot.inspect().settings);
+  h.commands.length=0;h.cc('MoveShift',127);h.context.onMidiMessageInternal([176,42,127]);h.cc('MoveShift',0);
+  assert.equal(h.commands.length,0);
+  h.cc('MoveKnob1',1);h.cc('MoveMainKnob',1);h.cc('MoveMainButton',127);h.down(0);h.up(0);
+  assert.equal(JSON.stringify(h.pilot.inspect().settings),settings);assert.equal(h.pilot.inspect().page,0);
+  h.labels.length=0;h.down(73);h.context.tick();assert.equal(h.labels.length,0);
+  assert.ok(h.commands.some(c=>c.op==='on'&&c.owner===MELODY_OWNER_START+1));
+  // Framework consumes Back itself on device; poll must detect its exit.
+  const count=h.commands.length;
+  c.close();h.context.tick();assert.ok(h.labels.length>0);assert.equal(h.commands.length,count);
+  assert.ok(!h.commands.some(c=>c.op==='off'));
+  h.up(68);h.up(72);h.up(73);assert.equal(h.pilot.inspect().voices.length,0);
+});
+
+test('bass gesture releases and STOP remain musical-owner safe inside chain view',()=>{
+  const h=host();withChain(h);
+  h.pilot.changePage(PAGES.indexOf('BASS'));h.cc('MoveKnob1',1);
+  h.context.onMidiMessageInternal([176,75,1]);
+  h.down(71);
+  h.cc('MoveShift',127);h.context.onMidiMessageInternal([176,42,127]);h.cc('MoveShift',0);
+  h.down(70);assert.equal(h.pilot.inspect().model.chordLabel,'F/E');
+  h.commands.length=0;h.up(71);
+  assert.ok(!h.commands.some(c=>c.op==='on'));assert.equal(h.pilot.inspect().active.index,3);
+  h.down(95);assert.equal(h.commands.at(-1).op,'kill');assert.equal(h.pilot.inspect().voices.length,0);
+  h.up(70);h.up(95);h.cc('MoveBack',127);
+  assert.equal(h.pilot.inspect().page,PAGES.indexOf('BASS'));
+});
+
+for(const profile of ['lab','public'])test(`${profile} co-run handles Back, unload and missing host support safely`,()=>{
+  const h=host(profile),c=withChain(h);
+  const enter=()=>{h.cc('MoveShift',127);h.context.onMidiMessageInternal([176,43,127]);h.cc('MoveShift',0);};
+  enter();h.cc('MoveBack',127);h.cc('MoveBack',0);
+  assert.notEqual(h.context.shadow_corun_state(),null); // peer owns navigation, not tool
+  c.close();h.context.tick();assert.equal(h.context.shadow_corun_state(),null);
+  enter();h.context.onUnload();assert.equal(h.context.shadow_corun_state(),null);
+  for(const failed of [false,true]){
+    const a=host(profile);if(failed){withChain(a);a.context.shadow_corun_begin_cede=()=>{throw new Error('no');};}
+    a.cc('MoveShift',127);a.context.onMidiMessageInternal([176,42,127]);a.cc('MoveShift',0);
+    a.context.tick();assert.ok(a.labels.includes('Chain view unavailable'));
+    a.down(68);assert.ok(a.commands.some(c=>c.op==='on'));
+  }
+});
 
 test('Public adapter Menu navigates pages and transport/steps do not activate hidden engines',()=>{
   const h=host('public');h.cc('MoveMenu',127);

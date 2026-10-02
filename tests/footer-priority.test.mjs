@@ -1,4 +1,5 @@
 import test from 'node:test';
+import {navigate} from './navigate.mjs';
 import assert from 'node:assert/strict';
 import {createPilot,PAGES} from '../src/pilot.mjs';
 import {encodeDocument} from '../src/settings.mjs';
@@ -7,7 +8,7 @@ import {renderScreen} from '../src/display.mjs';
 function setup() {
   const p=createPilot({read:()=>encodeDocument({chordSustain:'pedal',previewRoute:'both',
     melodyRoute:'external',melodyChannel:0,bassEnabled:true,bassChannel:3,arpClock:'free'},[]),write:()=>true});p.init();
-  const page=name=>p.changePage(PAGES.indexOf(name)-p.inspect().page);
+  const page=name=>navigate(p,name);
   const settle=()=>{for(let i=0;i<70;i++)p.tick();};
   return {p,page,settle};
 }

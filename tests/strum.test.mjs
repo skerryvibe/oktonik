@@ -1,17 +1,18 @@
 import test from 'node:test';
+import {navigate} from './navigate.mjs';
 import assert from 'node:assert/strict';
 import {createPilot,PAGES,CHORD_PADS as C} from '../src/pilot.mjs';
 import {STATE_PATH,encodeDocument,normalizeSettings,normalizeStep} from '../src/settings.mjs';
 function setup(files=new Map()) {
   const commands=[];const p=createPilot({read:k=>files.get(k),write:(k,v)=>{files.set(k,v);return true;},send:c=>commands.push(c)});p.init();
-  const page=name=>p.changePage(PAGES.indexOf(name)-p.inspect().page);
+  const page=name=>navigate(p,name);
   return {p,commands,files,page};
 }
-test('CHORDS has no STRUM shortcut; STRUM settings affect only next attacks',()=>{
+test('CHORDS has a STRUM gap shortcut; advanced STRUM settings affect only next attacks',()=>{
   const h=setup(new Map([[STATE_PATH,encodeDocument({bassEnabled:true,bassVelocityMode:'pad'},[])]]));
   h.p.pad(C[0],true,90);const voices=h.p.inspect().voices;
-  h.page('CHORDS');h.p.knob(6,1);assert.equal(h.p.inspect().model.pageName,'CHORDS');
-  assert.equal(h.p.inspect().model.cells[6].disabled,true);h.page('STRUM');
+  h.page('CHORDS');assert.equal(h.p.inspect().model.pageName,'CHORDS');
+  assert.equal(h.p.inspect().model.cells[6].id,'strumMs');h.page('STRUM');
   const before=h.commands.length;
   [4,3,30,20].forEach((delta,i)=>h.p.knob(i,delta));
   assert.deepEqual(h.p.inspect().voices,voices);assert.equal(h.commands.length,before);
