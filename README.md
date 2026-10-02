@@ -11,15 +11,15 @@ each part to a different instrument. OKTONIK generates MIDI, not audio.
 
 Co-run chain editing, persistent PLAY harmony feedback, signed inversions,
 simple STRUM and opt-in melody poly aftertouch on MELODY knob 6.
-No Shift menu pages. [Installation notes](docs/install-public.md).
+ [Installation notes](docs/install-public.md).
 
 - Five pages: PLAY, CHORD, MELODY, BASS and MIDI.
 - Live Chord Map, harmonic modifiers and per-pad chord editing.
 - Adaptive melody, Bass Gesture, independent sustain and MIDI routing.
-- Simple STRUM on CHORD.
+- STRUM on CHORD.
 - CHORD controls directly on PLAY, with parameter/value feedback.
 - Longer Chord Map names use two lines without shrinking the text.
-- Focused on live playing, not programming or recording chord sequences.
+- Focused on live playing.
 
 **[Illustrated user guide](docs/oktonik-public.md)** ·
 **[Report a problem](https://github.com/skerryvibe/oktonik/issues)**
