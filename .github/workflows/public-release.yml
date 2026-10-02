@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, 'release/*']
     tags: ['v*']
 permissions:
   contents: read
@@ -48,28 +48,37 @@ jobs:
             dist/release-next.json
           if-no-files-found: error
   draft-release:
-    if: (startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch') && github.repository == 'skerryvibe/oktonik'
+    if: (startsWith(github.ref, 'refs/tags/') || startsWith(github.ref, 'refs/heads/release/') || github.event_name == 'workflow_dispatch') && github.repository == 'skerryvibe/oktonik'
     needs: build
     runs-on: ubuntu-22.04
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           name: oktonik-public
           path: release-assets
-      - name: Create draft for human acceptance
+      - name: Create release (approved release branches publish; other triggers draft)
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ github.ref_name }}
           RELEASE_COMMIT: ${{ github.sha }}
           RELEASE_EVENT: ${{ github.event_name }}
+          RELEASE_REF: ${{ github.ref }}
         run: |
-          set -- --verify-tag
+          set -- --draft --verify-tag
           if [ "$RELEASE_EVENT" = workflow_dispatch ]; then
             RELEASE_TAG="v$(jq -r .version release-assets/release-next.json)"
-            set -- --target "$RELEASE_COMMIT"
+            set -- --draft --target "$RELEASE_COMMIT"
           fi
+          case "$RELEASE_REF" in refs/heads/release/*)
+            VERSION="$(jq -r .version release-assets/release-next.json)"
+            test "$RELEASE_REF" = "refs/heads/release/$VERSION"
+            RELEASE_TAG="v$VERSION"
+            test -f "docs/release-notes-$VERSION.md"
+            set -- --target "$RELEASE_COMMIT"
+          ;; esac
           case "$RELEASE_TAG" in *-*) set -- "$@" --prerelease ;; esac
-          gh release create "$RELEASE_TAG" release-assets/oktonik-module.tar.gz release-assets/SHA256SUMS release-assets/release-next.json --draft "$@" --title "OKTONIK $RELEASE_TAG" --notes "Requires Schwung 1.6.2+. Complete hardware acceptance and release notes before publishing. After publication, verify the download and promote release-next.json to the repository release.json."
+          gh release create "$RELEASE_TAG" release-assets/oktonik-module.tar.gz release-assets/SHA256SUMS release-assets/release-next.json "$@" --title "OKTONIK ${RELEASE_TAG#v}" --notes-file "docs/release-notes-${RELEASE_TAG#v}.md"
