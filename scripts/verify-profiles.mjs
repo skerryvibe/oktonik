@@ -11,9 +11,12 @@ for(const profile of process.argv.includes('--lab') ? ['lab'] : process.argv.inc
   const read=name=>execFileSync('tar',['-xOf',archive,`${id}/${name}`]);
   const manifest=JSON.parse(read('module.json'));
   assert.equal(manifest.id,id);assert.equal(manifest.author,'Skerry Vibe');assert.equal(manifest.version,version);
+  assert.equal(manifest.capabilities.suspend_self_managed,true);
+  assert.deepEqual(manifest.capabilities.button_passthrough,[86]);
   assert.match(read('profile.mjs').toString(),new RegExp(`BUILD_PROFILE = '${profile}'`));
-  for(const file of ['ui.js','pilot.mjs','project.mjs','settings.mjs','theory.mjs','display.mjs','ideas.mjs','recording.mjs','timeline.mjs','bass-gesture.mjs'])assert.deepEqual(read(file),readFileSync(`${root}src/${file}`));
+  for(const file of ['ui.js','pilot.mjs','capture.mjs','project.mjs','settings.mjs','theory.mjs','chord-library.mjs','harmony-controls.mjs','display.mjs','ideas.mjs','recording.mjs','timeline.mjs','clips.mjs','bass-gesture.mjs','smart-bass.mjs'])assert.deepEqual(read(file),readFileSync(`${root}src/${file}`));
   for(const file of ['dsp.so','install-swap'])assert.deepEqual(read(file),readFileSync(`${root}dist/${file}`));
   if(profile==='public')assert.deepEqual(readFileSync(`${root}dist/oktonik-module.tar.gz`),readFileSync(archive));
+  if(profile==='public')assert.match(read('GUIDE.html').toString(),new RegExp(`OKTONIK ${version.replace(/\./g,'\\.')}`));
   console.log(`Verified ${id} ${version}`);
 }

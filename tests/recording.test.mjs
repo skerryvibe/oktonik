@@ -24,7 +24,7 @@ test('short attacks, same-cell replacement, long holds, seek and clock loss are 
   assert.equal(r.observe(NaN,false).timing.steps,4);
   assert.equal(r.start(0,NaN,0,{},1),null);
 });
-function setup(settings={},files=new Map([[STATE_PATH,encodeDocument(settings,[])]])) {
+function setup(settings={},files=new Map([[STATE_PATH,encodeDocument({bassEnabled:false,bassGesture:false,...settings},[])]])) {
   let clock={beat:0,ready:false};const commands=[];
   const p=createPilot({clock:()=>clock,read:k=>files.get(k),write:(k,v)=>{files.set(k,v);return true;},send:c=>commands.push(c)});p.init();
   return {p,commands,files,time:(beat,ready=true)=>clock={beat,ready},page:name=>p.changePage(PAGES.indexOf(name)-p.inspect().page)};
@@ -38,7 +38,7 @@ test('Bass Gesture records a separate C/E/G lane and survives owner release and 
   const state=h.p.inspect();assert.equal(state.progression.filter(Boolean).length,1);
   assert.equal(state.progression[0].timing.steps,4);
   assert.deepEqual(state.bassProgression.filter(Boolean).map(e=>[e.note%12,e.steps,e.velocity]),[[0,1,91],[4,1,72],[7,2,65]]);
-  assert.equal(state.settings.bassPlayback,'clip');h.p.unload();
+  assert.equal(h.commands.findLast(c=>c.op==='config').bass_clip,1);h.p.unload();
   assert.deepEqual(setup({},h.files).p.inspect().bassProgression,state.bassProgression);
 });
 test('bass-only overdub preserves chords, selects roots, and ignores old/shifted releases',()=>{
@@ -61,12 +61,12 @@ test('chord-only recording preserves bass events and suppresses live automatic b
   assert.deepEqual(h.p.inspect().bassProgression,bass);assert.equal(chordName(h.p.inspect().progression[0]),'F');
   assert.ok(h.commands.slice(start).filter(c=>c.op==='on').every(c=>c.owner!==40));
 });
-test('changing record part finalizes/disarms, persists choice but never armed state',()=>{
-  const h=setup({bassEnabled:true});h.p.record();h.time(0);h.p.pad(C[0],true);h.time(2);
-  h.page('SEQ');h.p.knob(7,2);assert.equal(h.p.inspect().recordArmed,false);
+test('page changes retain ALL recording target; stop finalizes and armed state is never restored',()=>{
+  const h=setup({bassEnabled:true});h.p.recordContext();h.time(0);h.p.pad(C[0],true);h.time(2);
+  h.p.track(1);assert.equal(h.p.inspect().recordArmed,true);assert.equal(h.p.inspect().model.recordTarget,'all');h.p.recordContext();
   assert.equal(h.p.inspect().progression[0].timing.steps,2);assert.equal(h.p.inspect().bassProgression[0].steps,2);
   assert.equal(h.p.inspect().voices.length,0);h.p.unload();
-  const p=setup({},h.files).p;assert.equal(p.inspect().settings.recordPart,'bass');assert.equal(p.inspect().recordArmed,false);
+  const p=setup({},h.files).p;assert.equal(p.inspect().recordArmed,false);
 });
 test('Undo restores overwritten recording lanes and playback mode, including an active take',()=>{
   for(const part of ['both','chord','bass']) {
@@ -119,6 +119,35 @@ test('bass-only requires enabled bass and playback harmony still updates during 
   assert.equal(chordName(h.p.inspect().active.chord),'F');
   assert.ok(h.p.inspect().voices.some(([owner])=>owner===40));
   h.time(5);h.p.pad(C[0],false);h.p.pad(STOP_PAD,true);assert.equal(h.p.inspect().voices.length,0);
+});
+test('Record requests overdub and step voicing edits preserve independent bass and original pad',()=>{
+ const h=setup({bassEnabled:true});h.p.record();
+ assert.equal(h.commands.findLast(c=>c.op==='record').overdub,1);
+ h.time(0);h.p.pad(C[0],true);h.time(2);h.p.pad(C[0],false);h.p.record();
+ const bank=structuredClone(h.p.inspect().bank),bass=structuredClone(h.p.inspect().bassProgression);
+ h.page('SEQ');h.p.step(0,true);
+ const notes=h.p.inspect().progression[0].snapshot.notes;
+ h.p.knob(4,-1);const inv=h.p.inspect().progression[0].snapshot.notes;
+ assert.equal(inv[0],notes.at(-1)-12);
+ h.p.knob(4,1,{shift:true});assert.deepEqual(h.p.inspect().progression[0].snapshot.notes,inv.map(n=>n+12));
+ const oldBass=h.p.inspect().progression[0].snapshot.bass;h.p.knob(6,1);
+ assert.equal(h.p.inspect().progression[0].snapshot.bass,oldBass);
+ assert.equal(h.p.inspect().progression[0].performance.nudge,.01);
+ assert.deepEqual(h.p.inspect().bassProgression,bass);assert.deepEqual(h.p.inspect().bank,bank);
+});
+test('SAVED restores the editor-entry chord after extension exploration but preserves timing edits',()=>{
+ const h=setup();h.p.record();h.time(0);h.p.pad(C[0],true);h.time(2);h.p.pad(C[0],false);h.p.record();
+ h.page('SEQ');h.p.step(0,true);const original=h.p.inspect().progression[0];
+ assert.ok(!h.p.inspect().model.cells[7].id);
+ h.p.knob(1,5);assert.notDeepEqual(h.p.inspect().progression[0].snapshot.notes,original.snapshot.notes);
+ h.p.knob(6,-10);h.p.knob(3,-5);h.p.knob(1,-63);
+ const restored=h.p.inspect().progression[0];
+ assert.equal(h.p.inspect().model.cells[1].value,'SAVED');
+ assert.deepEqual(restored.snapshot,original.snapshot);assert.deepEqual(restored.intervals,original.intervals);
+ assert.equal(restored.performance.nudge,-.1);assert.equal(restored.timing.velocity,original.timing.velocity-5);
+ const slot=h.commands.findLast(c=>c.op==='slot'&&c.index===0);
+ assert.equal(slot.at,159000);
+ h.p.step(0,false);h.p.step(0,true);assert.equal(h.p.inspect().model.cells[6].value,'-10%');
 });
 test('hold-step editor changes only selected lane and closes on matching release',()=>{
   const h=setup({bassEnabled:true,bassGesture:true});h.p.record();h.time(0);h.p.pad(C[0],true);
@@ -178,14 +207,14 @@ test('LEN changes selected event and normalization bounds lengths without alteri
   const h=setup();h.p.step(0,true,{shift:true});const old=h.p.inspect().progression[0];assert.equal(old.timing,undefined);
   h.page('SEQ');h.p.step(0,true);h.p.knob(2,3);h.p.step(0,false);assert.equal(h.p.inspect().progression[0].timing.steps,4);
   assert.deepEqual(h.p.inspect().progression[0].snapshot,old.snapshot);
-  assert.equal(normalizeStep({...old,timing:{steps:999,velocity:-1}}).timing.steps,16);
+  assert.equal(normalizeStep({...old,timing:{steps:999,velocity:-1}}).timing.steps,64);
 });
-test('park, unload and rate changes finalize pending takes and disarm Record',()=>{
+test('park and unload finalize pending takes; rate changes are blocked during Record',()=>{
   for(const action of ['park','unload','rate']) {
     const h=setup();h.p.record();h.time(0);h.p.pad(C[0],true,71);h.time(3);
     if(action==='park')h.p.tick(null,true);
     else if(action==='unload')h.p.unload();
-    else {h.page('SEQ');h.p.knob(1,1);}
+    else {h.page('SEQ');h.p.knob(1,1);assert.equal(h.p.inspect().recordArmed,true);assert.equal(h.p.inspect().clips.parts.chord.clips[0].rate,2);h.p.record();}
     assert.equal(h.p.inspect().recordArmed,false);
     assert.deepEqual(h.p.inspect().progression[0].timing,{steps:3,velocity:71});
     assert.equal(h.commands.filter(c=>c.op==='record').at(-1).enabled,0);
@@ -205,4 +234,11 @@ test('project switch saves the pending take only to the outgoing project and nev
   assert.equal(p.inspect().recordArmed,false);assert.ok(p.inspect().progression.every(c=>!c));
   now=2000;files.set(ACTIVE_SET_PATH,'set-A\nFirst');p.tick();
   assert.deepEqual(p.inspect().progression[0].timing,{steps:3,velocity:69});assert.equal(p.inspect().recordArmed,false);
+});
+test('bass plays its clip while the clip has notes and otherwise follows the chord clip',()=>{
+  const files=new Map([[STATE_PATH,encodeDocument({bassEnabled:true,bassPlayback:'follow'},[],[],[{note:36,steps:1,velocity:68}])]]);
+  const h=setup({},files),bassClip=()=>h.commands.findLast(c=>c.op==='config').bass_clip;
+  assert.equal(bassClip(),1);
+  h.page('SEQ');h.p.knob(3,1);h.p.step(0,true,{delete:true});
+  assert.ok(h.p.inspect().bassProgression.every(e=>e===null));assert.equal(bassClip(),0);
 });

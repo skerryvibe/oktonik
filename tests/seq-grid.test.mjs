@@ -12,13 +12,13 @@ test('empty grid arms and displays all sixteen running positions',()=>{
   }
   assert.ok(p.inspect().progression.every(c=>!c));
 });
-test('SEQ hold chord plus step places/replaces without changing other slots or live voices',()=>{
+test('SEQ hold chord places on empty steps; Shift explicitly replaces occupied steps',()=>{
   const {p}=setup();p.changePage(PAGES.indexOf('SEQ'));p.pad(C[0],true);
   const voices=structuredClone(p.inspect().voices);
   p.step(0,true);p.step(8,true);p.step(15,true);
   assert.deepEqual(p.inspect().voices,voices);
   assert.deepEqual(p.inspect().progression.map((c,i)=>c?i:null).filter(i=>i!==null),[0,8,15]);
-  p.pad(C[0],false);p.pad(C[3],true);p.step(8,true);p.pad(C[3],false);
+  p.pad(C[0],false);p.pad(C[3],true);p.step(8,true,{shift:true});p.pad(C[3],false);
   assert.equal(chordName(p.inspect().progression[0]),'C');assert.equal(chordName(p.inspect().progression[8]),'F');
   p.step(8,true,{delete:true});assert.equal(p.inspect().progression[8],null);
   assert.equal(chordName(p.inspect().progression[15]),'C');

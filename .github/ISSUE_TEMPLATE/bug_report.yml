@@ -1,0 +1,96 @@
+name: Bug report
+description: Something in OKTONIK did not work as expected
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! Please do not attach private projects or credentials.
+        A short phone video helps a lot for timing, LED or sound problems.
+  - type: input
+    id: version
+    attributes:
+      label: OKTONIK version
+      description: Shown when OKTONIK opens.
+      placeholder: 0.2.0
+    validations:
+      required: true
+  - type: input
+    id: schwung
+    attributes:
+      label: Schwung version
+      placeholder: "1.7.3"
+    validations:
+      required: true
+  - type: input
+    id: midi
+    attributes:
+      label: What receives the MIDI
+      description: Move track, synth, USB device, channels.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Live playing (chords / melody / bass / modifiers)
+        - Recording / overdub / count-in / metronome
+        - Step editing
+        - Clips
+        - Shift + step shortcuts
+        - Extension profiles / voicings (SPRD, LEAD)
+        - Co-run (Shift + Track)
+        - Saving / switching sets
+        - MIDI routing / sustain / stuck notes
+        - Install / startup
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: What I did
+      placeholder: |
+        1.
+        2.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What I expected
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened
+    validations:
+      required: true
+  - type: dropdown
+    id: freeze
+    attributes:
+      label: Did Move freeze or restart?
+      options:
+        - "No"
+        - Only OKTONIK stopped
+        - The whole Move rebooted
+    validations:
+      required: true
+  - type: textarea
+    id: freeze_details
+    attributes:
+      label: If it froze or restarted
+      description: Was Move on the charger? What was the last thing you pressed?
+  - type: dropdown
+    id: repeat
+    attributes:
+      label: How often does it happen?
+      options:
+        - Every time
+        - Sometimes
+        - Once so far
+  - type: textarea
+    id: media
+    attributes:
+      label: Video or photo (optional)
+      description: Drag files here or paste a link.

@@ -5,10 +5,7 @@
   "author": "Skerry Vibe",
   "component_type": "tool",
   "subcategory": "performance",
-  "tags": [
-    "chord",
-    "polyphonic"
-  ],
+  "tags": ["chord", "polyphonic"],
   "github_repo": "skerryvibe/oktonik",
   "default_branch": "main",
   "asset_name": "oktonik-module.tar.gz",

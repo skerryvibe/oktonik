@@ -5,7 +5,7 @@ import { buildChordBank, buildLegacyChordBank, buildPadChord, applyModifiers, ch
   degreeName, SCALES, CHORD_TYPES, PAD_EXTENSIONS, melodyNotes, adaptiveScaleIntervals } from '../src/theory.mjs';
 import { STATE_PATH, encodeDocument, normalizeChord, normalizeOverride } from '../src/settings.mjs';
 
-function setup(settings = {}, files = new Map([[STATE_PATH, encodeDocument(settings, [])]])) {
+function setup(settings = {}, files = new Map([[STATE_PATH, encodeDocument({bassEnabled:false,bassGesture:false,...settings}, [])]])) {
   const commands = [];
   const pilot = createPilot({ read: p => files.get(p), write: (p, v) => { files.set(p, v); return true; },
     send: c => commands.push(c) });
@@ -127,15 +127,14 @@ test('explicit chord recipes are valid, ascending and preserve every chord pitch
 test('new variations update held melody and bass only on an actual chord attack', () => {
   for (const mode of ['chord','scale','chromatic']) {
     const {pilot,commands}=setup({autoSustain:true,bassEnabled:true,melodyMode:mode,melodyAdapt:true});
-    pilot.pad(C[4],true); pilot.pad(M[1],true);
+    pilot.pad(C[4],true); pilot.pad(M[1],true);const heldNote=new Map(pilot.inspect().voices).get(9).notes[0];
     for (const modifier of [92,93,94]) {
       const before=commands.length; pilot.pad(modifier,true); assert.equal(commands.length,before);
       pilot.pad(C[4],true);
       const active=pilot.inspect().active.chord;
       const v=new Map(pilot.inspect().voices);
       assert.equal(v.get(LIVE_BASS_OWNER).notes[0]%12,active.rootOffset);
-      if(mode==='chord') assert.ok(active.intervals.some(n=>(n+active.rootOffset)%12===v.get(9).notes[0]%12));
-      if(mode==='scale') assert.equal(v.get(9).notes[0],melodyNotes(active,pilot.inspect().settings)[1]);
+      if(mode!=='chromatic') assert.equal(v.get(9).notes[0],heldNote); // held note keeps sounding, no re-strike
       if(mode==='chromatic') assert.equal(v.get(9).notes[0],61);
       const count=commands.length; pilot.pad(modifier,false); assert.equal(commands.length,count);
     }

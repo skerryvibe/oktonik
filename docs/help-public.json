@@ -1,8 +1,215 @@
-{"title":"OKTONIK","children":[
-{"title":"Play","lines":["Harmonic performance","instrument","By Skerry Vibe","Left: 8 chord pads.","Right: 16 melody","pads.","Main knob / Menu:","select 5 pages.","PLAY knobs match","CHORD controls.","Touch knob: shows","parameter and value.","Shift + chord pad:","edit that chord.","STOP: all notes off."]},
-{"title":"Harmony","lines":["Hold modifiers for","chord variations.","Shift + BORROW:","lock or unlock.","INV moves downward","or upward. Turn via","-1, AUTO, ROOT, +1.","Shift + turn INV:","return to AUTO.","Manual INV overrides","LEAD.","Each part has its","own SUST setting.","CC64 affects the","whole MIDI channel."]},
-{"title":"Strum","lines":["CHORD / PLAY knob 7:","note spacing in ms.","Zero: play together.","Notes strum upward.","Changes affect the","next chord attack."]},
-{"title":"Aftertouch","lines":["MELODY knob 6 AT:","OFF or POLY.","Default is OFF.","Pressure follows the","held melody note.","Your synth must use","poly aftertouch.","Not MPE; no chord","aftertouch yet."]},
-{"title":"Schwung chains","lines":["Needs Schwung 1.6.2","or newer.","Shift + Track 1-4:","open that chain.","Knobs edit the open","synth or effect.","Pads still play","OKTONIK.","Back: previous view.","Back at chain root:","return to OKTONIK.","STOP still works.","This is a Tool,","not a MIDI FX."]},
-{"title":"Bass","lines":["Hold a chord, then","press another chord","pad for its root","as the bass note.","Release all pads","before a new chord.","MIDI routes each","part separately."]},
-{"title":"Live performance","lines":["PLAY knobs 1-4:","KEY, SCALE,","EXT, OCT.","PLAY knobs 5-8:","SPRD, LEAD, STRUM,","SUST.","No sequencing in","this preview.","Settings save per","Move project."]}]}
+{
+  "title": "OKTONIK",
+  "children": [
+    {
+      "title": "Play",
+      "lines": [
+        "By Skerry Vibe",
+        "0.2.0",
+        "Left: 8 chord pads.",
+        "Right: 16 melody",
+        "pads. STOP: kill.",
+        "PLAY knobs:",
+        "KEY OCT EXT SCALE",
+        "SPRD LEAD STRUM SUST",
+        "Track 1: CHORD",
+        "Track 2: BASS",
+        "Track 3: MELODY",
+        "Main knob: pages.",
+        "Menu: clip view.",
+        "Track again or Back:",
+        "return to PLAY."
+      ]
+    },
+    {
+      "title": "Harmony",
+      "lines": [
+        "Shift + chord pad:",
+        "edit that chord.",
+        "Shift + mod pad:",
+        "edit its function.",
+        "Hold BORROW + press",
+        "main knob: lock.",
+        "Repeat to unlock.",
+        "PLAY + main knob:",
+        "EXT PROF, MOD PADS.",
+        "Pad edits override",
+        "profile recipes.",
+        "LEAD CNTR: near OCT,",
+        "FREE: may drift."
+      ]
+    },
+    {
+      "title": "Melody",
+      "lines": [
+        "CHORD SCALE CHROM",
+        "PENTA BLUES modes.",
+        "PENTA/BLUES TYPE:",
+        "AUTO MAJOR MINOR.",
+        "SCALE ADAPT TARGET:",
+        "approach target.",
+        "AT OFF/POLY:",
+        "poly key pressure.",
+        "Needs synth support.",
+        "Not MPE."
+      ]
+    },
+    {
+      "title": "Recording",
+      "lines": [
+        "Sample button next",
+        "to Capture arms REC.",
+        "PLAY: all parts.",
+        "Track 2/3: own part.",
+        "Track 1: SETUP C.REC",
+        "(CHORD, C+B, ALL).",
+        "Play: transport",
+        "Sample again: disarm",
+        "Existing clips loop",
+        "during recording.",
+        "REC while playing",
+        "punches in at once.",
+        "COUNT: only from",
+        "stop.",
+        "Undo: undo take.",
+        "M + Track: mute.",
+        "Native Record is not",
+        "OKTONIK record arm."
+      ]
+    },
+    {
+      "title": "Clips",
+      "lines": [
+        "Menu opens CLIPS.",
+        "Pad rows from top:",
+        "CHORD BASS MELODY.",
+        "8 clips per part.",
+        "Track selects steps.",
+        "LEN: 16/32/64 steps.",
+        "RATE: step duration.",
+        "QNT: this clip, OFF",
+        "PAGE: step bank.",
+        "COUNT: count-in.",
+        "METRO OFF/ON/REC:",
+        "ON clicks with Play,",
+        "REC while recording.",
+        "Hold Loop + step",
+        "1/2/4: clip length.",
+        "Stop to edit length.",
+        "Copy: copy clip.",
+        "X: clear clip."
+      ]
+    },
+    {
+      "title": "Step editing",
+      "lines": [
+        "Empty step: store",
+        "last played event.",
+        "Hold filled step:",
+        "audition and edit.",
+        "LEN VEL NUDGE.",
+        "Chord: ROOT EXT INV",
+        "and STRUM too.",
+        "Saved voicing stays",
+        "fixed as you change",
+        "global settings.",
+        "Shortening clips",
+        "does not erase notes",
+        "beyond the new end."
+      ]
+    },
+    {
+      "title": "Step gestures",
+      "lines": [
+        "Tap empty step:",
+        "store last played.",
+        "Hold chord pad +",
+        "steps: place chord.",
+        "Hold step + later",
+        "step: set length.",
+        "Hold step + Left/",
+        "Right: nudge 10%.",
+        "With Shift: 1%.",
+        "Copy + step, then",
+        "step: copy it.",
+        "Delete + step: clear",
+        "Hold pad + filled",
+        "step: overwrite it.",
+        "Left/Right: pages.",
+        "Faint steps: a note",
+        "still sounding."
+      ]
+    },
+    {
+      "title": "Shift + step",
+      "lines": [
+        "Hold Shift: icons",
+        "show shortcuts.",
+        "Lit step: setting on",
+        "2 MIDI page",
+        "3 SETUP: QNT %,",
+        "  COUNT, METRO,",
+        "  volume, Track1 REC",
+        "5 Tempo: in Move",
+        "6 METRO off/on/rec",
+        "  (blue ON, red REC)",
+        "7 STRUM menu;",
+        "  knob 5: on/off",
+        "8 R.PAD MEL/BASS",
+        "9 SCALE page",
+        "10 Full velocity",
+        "14 New empty clip",
+        "15 Double the loop",
+        "16 Quantize clip:",
+        "  PLAY = all parts",
+        "13 is Schwung menu."
+      ]
+    },
+    {
+      "title": "Schwung chains",
+      "lines": [
+        "Shift + Track 1-4:",
+        "open that chain.",
+        "Knobs edit synth/FX.",
+        "Pads play OKTONIK.",
+        "Back: previous view.",
+        "At chain root Back",
+        "returns to OKTONIK.",
+        "STOP still works."
+      ]
+    },
+    {
+      "title": "Right-hand bass",
+      "lines": [
+        "R.PAD MEL/BASS:",
+        "knob 7 on BASS",
+        "and MELODY.",
+        "Enable BASS first.",
+        "Uses bass settings",
+        "and MIDI output.",
+        "Left pads: chords.",
+        "Release pads before",
+        "switching. Stop REC.",
+        "Record ALL or BASS.",
+        "Bass follows touch;",
+        "Shift+10: full vel."
+      ]
+    },
+    {
+      "title": "Bass and MIDI",
+      "lines": [
+        "Hold a chord, press",
+        "another chord pad:",
+        "root becomes bass.",
+        "Release all before",
+        "a new chord.",
+        "Bass records its own",
+        "lane. MIDI routes",
+        "parts separately.",
+        "SUST is per part.",
+        "CC64 affects the",
+        "whole MIDI channel."
+      ]
+    }
+  ]
+}

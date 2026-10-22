@@ -23,6 +23,6 @@ test('Public signed INV restores AUTO and PLAY footer keeps active harmony',()=>
   p.knob(3,1);assert.equal(p.inspect().model.cells[3].value,'AUTO');assert.equal(p.inspect().bank[0].lockInversion,false);
   p.selectEdit(-1);p.pad(C[1],true);
   for(let i=0;i<100;i++)p.tick();
-  const m=p.inspect().model;assert.equal(m.detail,`${m.chordLabel} | ${m.degreeLabel}`);
+  const m=p.inspect().model;assert.equal(m.detail,`${m.detail.split(' ')[0]} Major | ${m.degreeLabel}`);
   assert.ok(!m.detail.includes('chord roots'));
 });

@@ -1,6 +1,8 @@
 import { normalizeHarmony, importLegacyChord, EXTENSIONS, MELODY_MODES, BASS_OCTAVE_MIN, BASS_OCTAVE_MAX,
   CHORD_TYPES, PAD_EXTENSIONS, buildLegacyChordBank, applyModifiers, chordNotes, voiceLeadNotes, bassNotes } from './theory.mjs';
 import {normalizePerformance,EVENTS_PER_CELL} from './timeline.mjs';
+import {normalizeClips,selectedClip} from './clips.mjs';
+import {normalizeModifiers,normalizeExtensionProfile} from './harmony-controls.mjs';
 
 import {moduleId,globalStatePath} from './profile.mjs';
 export const MODULE_DIR = '/data/UserData/schwung/modules/tools/' + moduleId();
@@ -20,9 +22,21 @@ export function normalizeSettings(raw = {}) {
   const { color: _legacyColor, ...harmony } = normalizeHarmony(input);
   return {
     ...harmony,
+    ...normalizeExtensionProfile(input),
+    modifierAssignments: normalizeModifiers(input.modifierAssignments),
     ...strumSettings(input),
     channel: integer(input.channel ?? 0, 0, 15, 0),
     divisi: input.divisi === true,
+    ensembleSmooth: input.ensembleSmooth === true,
+    chordExpression: ['off','poly','cc1','cc11'].includes(input.chordExpression)?input.chordExpression:'off',
+    bassExpression: ['off','poly','cc1','cc11'].includes(input.bassExpression)?input.bassExpression:'off',
+    melodyExpression: ['off','poly','cc1','cc11'].includes(input.melodyExpression)?input.melodyExpression:input.melodyAftertouch===true?'poly':'off',
+    bassExpressionMin: integer(input.bassExpressionMin??20,0,127,20),
+    bassExpressionMax: Math.max(integer(input.bassExpressionMin??20,0,127,20),integer(input.bassExpressionMax??110,0,127,110)),
+    melodyExpressionMin: integer(input.melodyExpressionMin??20,0,127,20),
+    melodyExpressionMax: Math.max(integer(input.melodyExpressionMin??20,0,127,20),integer(input.melodyExpressionMax??110,0,127,110)),
+    expressionMin: integer(input.expressionMin??20,0,127,20),
+    expressionMax: Math.max(integer(input.expressionMin??20,0,127,20),integer(input.expressionMax??110,0,127,110)),
     ensembleChannels: Array.from({length:8},(_,i)=>integer(Array.isArray(input.ensembleChannels)?input.ensembleChannels[i]:undefined,0,15,
       Math.min(8,integer(input.channel??0,0,15,0))+i)),
     rate: integer(input.rate ?? 2, 0, 4, 2),
@@ -31,17 +45,27 @@ export function normalizeSettings(raw = {}) {
     route: ROUTES.includes(input.route) ? input.route : 'move',
     previewRoute: ROUTES.includes(input.previewRoute) ? input.previewRoute : 'move',
     voiceLead: input.voiceLead === true,
+    leadRegister: input.leadRegister==='free'?'free':'center',
+    approachMode: input.approachMode==='profile'?'profile':'basic',
     melodyFollow: input.melodyFollow === 'pad' ? 'pad' : 'nearest',
     melodyMode: MELODY_MODES.includes(input.melodyMode) ? input.melodyMode : 'chord',
     melodyAdapt: input.melodyAdapt === true,
+    melodyAdaptTarget: input.melodyAdaptTarget === true,
+    melodySoloType: ['major','minor'].includes(input.melodySoloType) ? input.melodySoloType : 'auto',
     melodyAftertouch: input.melodyAftertouch === true,
     melodyOctave: integer(input.melodyOctave ?? input.octave ?? 0, -3, 3, 0),
     melodyRoute: ROUTES.includes(input.melodyRoute) ? input.melodyRoute : ROUTES.includes(input.previewRoute) ? input.previewRoute : 'move',
     melodyChannel: integer(input.melodyChannel ?? input.channel ?? 0, 0, 15, 0),
-    bassEnabled: input.bassEnabled === true,
-    bassGesture: input.bassGesture === true,
+    bassEnabled: input.bassEnabled !== false,
+    bassPads: input.bassPads === true,
+    bassGesture: input.bassGesture !== false,
     bassPlayback: input.bassPlayback === 'clip' ? 'clip' : 'follow',
-    recordPart: ['both','chord','bass'].includes(input.recordPart) ? input.recordPart : 'both',
+    recordPart: ['all','both','chord','bass','melody'].includes(input.recordPart) ? input.recordPart : 'all',
+    countIn: input.countIn===true,
+    metronome: ['on','rec'].includes(input.metronome) ? input.metronome : 'off',
+    fullVelocity: input.fullVelocity===true,
+    metroVolume: integer(input.metroVolume??100,10,120,100),
+    chordRecord: ['chord','both'].includes(input.chordRecord) ? input.chordRecord : 'all',
     quantize:integer(input.quantize??100,0,100,100),
     arpEnabled: input.arpEnabled === true,
     arpClock: input.arpClock === 'free' ? 'free' : 'sync',
@@ -57,7 +81,7 @@ export function normalizeSettings(raw = {}) {
     arpChannel: integer(input.arpChannel ?? 1, 0, 15, 1),
     bassMode: input.bassMode === 'low' ? 'low' : 'root',
     ideasColor: ['IN', 'MIX', 'OUT'].includes(input.ideasColor) ? input.ideasColor : 'MIX',
-    ideasMode: input.ideasMode === 'to' ? 'to' : 'next',
+    ideasMode: ['next','to','alt'].includes(input.ideasMode) ? input.ideasMode : 'next',
     ideasTarget: integer(input.ideasTarget ?? 0, 0, 7, 0),
     bassOctave: integer(input.bassOctave ?? (normalizeHarmony(input).octave - integer(input.bassOctaves ?? 1, 1, 2, 1)), BASS_OCTAVE_MIN, BASS_OCTAVE_MAX, -1),
     bassVelocity: integer(input.bassVelocity ?? 100, 1, 127, 100),
@@ -82,7 +106,7 @@ export function normalizeChord(raw) {
     rootOffset: raw.rootOffset,
     intervals: [...new Set(raw.intervals)].sort((a, b) => a - b),
     degree: integer(raw.degree ?? 0, -1, 11, 0),
-    source: ['diatonic', 'borrowed', 'secondary', 'approach', 'substitute', 'custom'].includes(raw.source) ? raw.source : 'diatonic',
+    source: ['diatonic', 'borrowed', 'secondary', 'approach', 'substitute', 'custom','leading','commonDim','backdoor','minorIV'].includes(raw.source) ? raw.source : 'diatonic',
     register: integer(raw.register ?? 0, -4, 4, 0),
     inversion: integer(raw.inversion ?? 0, -7, 7, 0),
     spread: integer(raw.spread ?? 0, 0, 2, 0),
@@ -102,7 +126,7 @@ export function normalizeBassStep(raw, nested=false) {
   if (!raw || !Number.isInteger(raw.note) || raw.note < 0 || raw.note > 127) return null;
   const performance=normalizePerformance(raw.performance);
   const more=nested!==true&&Array.isArray(raw.more)?raw.more.slice(0,EVENTS_PER_CELL-1).map(e=>normalizeBassStep(e,true)).filter(Boolean):[];
-  return {note:raw.note,steps:integer(raw.steps??1,1,16,1),velocity:integer(raw.velocity??100,1,127,100),
+  return {note:raw.note,steps:integer(raw.steps??1,1,64,1),velocity:integer(raw.velocity??100,1,127,100),
     ...(performance?{performance}:{}),...(more.length?{more}:{})};
 }
 
@@ -126,6 +150,11 @@ export function normalizeOverride(raw) {
     const variant = { dom: raw.variant.dom === true, flip: raw.variant.flip === true,
       sus: [2, 4].includes(raw.variant.sus) ? raw.variant.sus : 0 };
     for (const key of ['ii', 'sub', 'borrow']) if (raw.variant[key] === true) variant[key] = true;
+    if (['add7','flat7','maj7'].includes(raw.variant.seventh)) variant.seventh=raw.variant.seventh;
+    if (raw.variant.add9===true) variant.add9=true;
+    for(const key of ['add6','sharp11','flat13','root','shell'])if(raw.variant[key]===true)variant[key]=true;
+    if(['dimTo','commonDim','backdoor','minorIV'].includes(raw.variant.approach))variant.approach=raw.variant.approach;
+    if(['flat9','sharp9'].includes(raw.variant.ninth))variant.ninth=raw.variant.ninth;
     if (Object.values(variant).some(Boolean)) result.variant = variant;
   }
   return Object.keys(result).length ? result : null;
@@ -141,7 +170,7 @@ export function normalizeStep(raw, nested=false) {
   const more=nested!==true&&Array.isArray(raw.more)?raw.more.slice(0,EVENTS_PER_CELL-1).map(e=>normalizeStep(e,true)).filter(e=>e?.snapshot):[];
   if(more.length)chord.more=more;
   if(raw.timing && typeof raw.timing==='object') chord.timing={
-    steps:integer(raw.timing.steps,1,16,1),
+    steps:integer(raw.timing.steps,1,64,1),
     ...(Number.isInteger(raw.timing.velocity)&&raw.timing.velocity>0&&raw.timing.velocity<=127?{velocity:raw.timing.velocity}:{})};
   const snap = raw.snapshot;
   if (!snap) return chord;
@@ -152,6 +181,7 @@ export function normalizeStep(raw, nested=false) {
   const harmony = normalizeHarmony(snap);
   return { ...chord, snapshot: { notes: [...new Set(snap.notes)].sort((a,b) => a-b),
     bass: snap.bass, key: snap.key, scaleId: harmony.scaleId,
+    ...(Number.isInteger(snap.inversion)?{inversion:integer(snap.inversion,-127,127,0)}:{}),
     strumMs: harmony.strumMs, ...strumSettings(snap), voiceLead: snap.voiceLead === true } };
 }
 
@@ -197,16 +227,22 @@ export function decodeDocument(raw) {
       lockInversion: override.lockInversion === true });
   }
   const bassProgression=Array.from({length:STEP_COUNT},(_,i)=>normalizeBassStep(raw.bassProgression?.[i]));
-  return { settings, progression, overrides, bassProgression };
+  const melodyProgression=Array.from({length:STEP_COUNT},(_,i)=>normalizeBassStep(raw.melodyProgression?.[i]));
+  const clips=normalizeClips(raw.clips,{chord:progression,bass:bassProgression,melody:melodyProgression},
+    {chord:normalizeStep,bass:normalizeBassStep,melody:normalizeBassStep},settings);
+  return { settings, progression:selectedClip(clips,'chord').events, overrides,
+    bassProgression:selectedClip(clips,'bass').events, melodyProgression:selectedClip(clips,'melody').events,clips };
 }
 
-export function encodeDocument(settings, progression, overrides = [], bassProgression = []) {
+export function encodeDocument(settings, progression, overrides = [], bassProgression = [], melodyProgression = [], clips = null) {
   return JSON.stringify({
     format: 'chord-pilot', schemaVersion: 7, version: '0.1.0-rc.2',
     settings: normalizeSettings(settings),
     progression: migrateSteps(Array.from({ length: STEP_COUNT }, (_, i) => normalizeStep(progression[i])), normalizeSettings(settings)),
     overrides: Array.from({ length: 8 }, (_, i) => normalizeOverride(overrides[i])),
     bassProgression: Array.from({length:STEP_COUNT},(_,i)=>normalizeBassStep(bassProgression[i])),
+    melodyProgression: Array.from({length:STEP_COUNT},(_,i)=>normalizeBassStep(melodyProgression[i])),
+    ...(clips?{clips}:{}),
   });
 }
 
@@ -220,7 +256,7 @@ export function readSettings(read) {
     try {
       const text = read(path);
       if (!text) continue;
-      if (text.length > 262144) throw new Error('Settings file too large');
+      if (text.length > 4194304) throw new Error('Settings file too large');
       const state = decodeDocument(JSON.parse(text));
       return { ...state, imported: path !== STATE_PATH, source: path, warnings };
     } catch (_error) { warnings.push(path); }
@@ -228,5 +264,5 @@ export function readSettings(read) {
   // New-project defaults only. Keep decoder fallbacks unchanged so older
   // documents without melody fields retain their historical behavior.
   return { settings: normalizeSettings({ melodyMode: 'scale', melodyOctave: -1, melodyAdapt: true, bassVelocityMode: 'pad' }),
-    progression: Array(STEP_COUNT).fill(null), bassProgression:Array(STEP_COUNT).fill(null), overrides: Array(8).fill(null), imported: false, warnings };
+    progression: Array(STEP_COUNT).fill(null), bassProgression:Array(STEP_COUNT).fill(null), melodyProgression:Array(STEP_COUNT).fill(null), overrides: Array(8).fill(null), imported: false, warnings };
 }

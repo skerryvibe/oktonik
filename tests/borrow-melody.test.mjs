@@ -22,10 +22,10 @@ test('BORROW changes the entire scale immediately, silently, and returns on rele
 });
 test('locked BORROW keeps full parallel scale after borrowed chords and toggles off',()=>{
   const {p,scale}=setup();
-  p.pad(94,true,100,{shift:true});p.pad(94,false);
+  p.pad(94,true);p.mainButton(true);p.mainButton(false);p.pad(94,false);
   p.pad(C[3],true);p.pad(C[3],false);
   assert.deepEqual(scale(),[0,2,3,5,7,8,10]);
-  p.pad(94,true,100,{shift:true});p.pad(94,false);
+  p.pad(94,true);p.mainButton(true);p.mainButton(false);p.pad(94,false);
   p.pad(C[0],true);
   assert.deepEqual(scale(),[0,2,4,5,7,9,11]);
 });

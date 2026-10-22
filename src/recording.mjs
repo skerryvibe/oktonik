@@ -7,16 +7,16 @@ export function createChordRecorder({preserveTiming=false}={}) {
     if(!take)return null;
     const current=take;take=null;
     const end=Number.isFinite(beat)&&beat>=current.beat?beat:current.beat;
-    const steps=Math.max(1,Math.min(16,Math.round(end/current.span)-current.start));
+    const steps=Math.max(1,Math.min(current.length,Math.round(end/current.span)-current.start));
     const position=current.beat/current.span;
-    return {index:preserveTiming?Math.floor(position)%16:current.start%16,payload:current.payload,timing:{steps,velocity:current.velocity},
-      ...(preserveTiming?{position,performance:{start:position%16,duration:Math.max(.0001,Math.min(16,(end-current.beat)/current.span))}}:{})};
+    return {index:preserveTiming?Math.floor(position)%current.length:current.start%current.length,payload:current.payload,timing:{steps,velocity:current.velocity},
+      ...(preserveTiming?{position,performance:{start:position%current.length,duration:Math.max(.0001,Math.min(current.length,(end-current.beat)/current.span))}}:{})};
   }
   return {
-    start(owner,beat,rate,payload,velocity) {
+    start(owner,beat,rate,payload,velocity,length=16) {
       if(!Number.isFinite(beat)||beat<0||beat>=1e12)return null;
       const previous=finish(beat),span=STEP_BEATS[rate]||1;
-      take={owner,beat,span,start:Math.round(beat/span),payload,velocity:Math.max(1,Math.min(127,Number.isFinite(velocity)?Math.round(velocity):100))};
+      take={owner,beat,span,length:[16,32,64].includes(length)?length:16,start:Math.round(beat/span),payload,velocity:Math.max(1,Math.min(127,Number.isFinite(velocity)?Math.round(velocity):100))};
       lastBeat=beat;return previous;
     },
     release(owner,beat=lastBeat){return take?.owner===owner?finish(beat):null;},

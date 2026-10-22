@@ -9,7 +9,7 @@ function setup(settings = {}, files = new Map([[STATE_PATH, encodeDocument(setti
   const pilot = createPilot({ read: p => files.get(p), write: (p, value) => { files.set(p, value); return true; },
     send: c => commands.push(c), leds: values => leds.push(values) });
   pilot.init();
-  const latch = () => { pilot.pad(94, true, 100, { shift: true }); pilot.pad(94, false); };
+  const latch = () => { pilot.pad(94, true); pilot.mainButton(true);pilot.mainButton(false);pilot.pad(94, false); };
   const play = (index, modifier) => {
     if (modifier) pilot.pad(modifier, true);
     pilot.pad(C[index], true); pilot.pad(C[index], false);
@@ -19,15 +19,15 @@ function setup(settings = {}, files = new Map([[STATE_PATH, encodeDocument(setti
   return { pilot, commands, leds, files, latch, play };
 }
 
-test('Shift + BORROW toggles once per physical press and does not arm momentary borrow when unlocking', () => {
+test('BORROW + jog press toggles once per physical press and does not arm momentary borrow when unlocking', () => {
   const { pilot, commands } = setup();
   const before = commands.length;
-  pilot.pad(94, true, 100, { shift: true });
-  pilot.pad(94, true, 70, { shift: true });
+  pilot.pad(94, true);pilot.mainButton(true);
+  pilot.mainButton(true);
   assert.equal(pilot.inspect().borrowLocked, true);
-  pilot.pad(94, false);
+  pilot.pad(94, false);pilot.mainButton(false);
   assert.equal(pilot.inspect().modifiers.borrow, true);
-  pilot.pad(94, true, 100, { shift: true });
+  pilot.pad(94, true);pilot.mainButton(true);pilot.mainButton(false);
   assert.equal(pilot.inspect().borrowLocked, false);
   assert.equal(pilot.inspect().modifiers.borrow, undefined); // Even before lifting BORROW.
   pilot.pad(94, false, 0, { shift: true });
@@ -56,15 +56,16 @@ test('latched BORROW supports ii-V-I and SUB on borrowed targets without changin
 test('locking/unlocking is silent with sustained chord, bass and melody; next attack chooses the harmony', () => {
   for (const mode of ['chord', 'scale', 'chromatic']) {
     const { pilot, commands, latch, play } = setup({ autoSustain: true, bassEnabled: true, melodyMode: mode, melodyAdapt: true });
-    play(3); pilot.pad(M[2], true);
+    play(3); pilot.pad(M[2], true);const heldNote=new Map(pilot.inspect().voices).get(10).notes[0];
     let voices = structuredClone(pilot.inspect().voices), count = commands.length;
     latch();
     assert.deepEqual(pilot.inspect().voices, voices); assert.equal(commands.length, count);
     assert.equal(play(3), 'Fm');
     const active = pilot.inspect().active.chord;
     assert.equal(new Map(pilot.inspect().voices).get(LIVE_BASS_OWNER).notes[0] % 12, 5);
-    if (mode !== 'chord') assert.equal(new Map(pilot.inspect().voices).get(10).notes[0], melodyNotes(active,
-      {...pilot.inspect().settings, ...(mode === 'scale' ? {scaleId:'natural_minor'} : {})})[2]);
+    // Outside CHORD mode a held melody note keeps sounding unchanged; new presses use the new harmony.
+    if (mode !== 'chord') assert.equal(new Map(pilot.inspect().voices).get(10).notes[0], heldNote);
+    void melodyNotes;
     voices = structuredClone(pilot.inspect().voices); count = commands.length;
     latch();
     assert.deepEqual(pilot.inspect().voices, voices); assert.equal(commands.length, count);

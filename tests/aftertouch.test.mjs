@@ -37,14 +37,14 @@ test('release clears pressure with off, hold and pedal; late messages cannot rev
     const n=h.pressures().length;h.p.pressure(0,99);h.p.tick();assert.equal(h.pressures().length,n);
   }
 });
-test('disable is silent except pressure reset; toggle saves without a schema bump',()=>{
-  const h=setup();h.p.pad(M[0],true);h.p.pressure(0,70);h.p.tick();h.page('M.EXTRA');
-  const start=h.commands.length;h.p.knob(1,-1);
-  assert.deepEqual(h.commands.slice(start),[{op:'pressure',owner:8,pressure:0}]);
-  assert.equal(h.p.inspect().model.cells[1].value,'OFF');
-  h.p.knob(1,1);h.p.tick();assert.equal(h.pressures().at(-1).pressure,0);
+test('changing expression mode stops safely; toggle saves without a schema bump',()=>{
+  const h=setup();h.p.pad(M[0],true);h.p.pressure(0,70);h.p.tick();h.page('MELODY');
+  const start=h.commands.length;h.p.knob(5,-1);
+  assert.ok(h.commands.slice(start).some(c=>c.op==='panic'));
+  assert.equal(h.p.inspect().model.cells[5].value,'OFF');
+  h.p.knob(5,1);h.p.tick();
   h.p.unload();assert.equal(JSON.parse(h.saved()).schemaVersion,7);
-  assert.match(h.saved(),/"melodyAftertouch":true/);
+  assert.match(h.saved(),/"melodyExpression":"poly"/);
 });
 test('STOP, park and route changes discard queued pressure; Public is opt-in too',()=>{
   for(const action of [h=>h.p.panic(),h=>h.p.tick(null,true),h=>{h.page('MIDI');h.p.knob(3,1);}]) {

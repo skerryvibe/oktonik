@@ -1,0 +1,44 @@
+name: Feedback or idea
+description: What works, what feels wrong or un-Move-like, and what you miss
+labels: ["feedback"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        No bug needed. Musical impressions are just as useful as crash reports.
+  - type: input
+    id: version
+    attributes:
+      label: OKTONIK version
+      placeholder: 0.2.0
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Live playing
+        - Recording / clips / steps
+        - Shift + step shortcuts
+        - Extension profiles / voicings
+        - Guide / documentation
+        - Install
+        - General
+  - type: textarea
+    id: works
+    attributes:
+      label: What works well
+  - type: textarea
+    id: rough
+    attributes:
+      label: What felt confusing, unmusical or un-Move-like
+  - type: textarea
+    id: wish
+    attributes:
+      label: What I'd like to see
+  - type: textarea
+    id: setup
+    attributes:
+      label: My setup (optional)
+      description: Instruments, style of music, how you use Move.

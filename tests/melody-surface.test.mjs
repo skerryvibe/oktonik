@@ -7,7 +7,7 @@ import { SCALES, buildChordBank, melodyNotes, bassNotes, chordName, applyModifie
 import { STATE_PATH, encodeDocument, decodeDocument, normalizeSettings } from '../src/settings.mjs';
 
 function setup(settings = {}, initialFiles) {
-  const commands = [], files = initialFiles || new Map([[STATE_PATH, encodeDocument(settings, [])]]);
+  const commands = [], files = initialFiles || new Map([[STATE_PATH, encodeDocument({bassEnabled:false,bassGesture:false,...settings}, [])]]);
   let leds = [];
   const pilot = createPilot({ read: p => files.get(p), write: (p, text) => { files.set(p, text); return true; },
     send: c => commands.push(c), leds: values => { leds = values; } });
@@ -24,16 +24,17 @@ test('all 16 right-hand pads ascend bottom-to-top with disjoint melody, step and
   const { pilot, commands } = setup({ bassEnabled: true });
   pilot.pad(C[0], true);
   for (let i = 0; i < 8; i++) pilot.step(i, true, { shift: true });
+  // With the chord pad held, pressing filled steps overwrites them with that chord.
   for (let i = 0; i < 8; i++) pilot.step(i, true);
   const notes = melodyNotes(pilot.inspect().active.chord, pilot.inspect().settings);
   M.forEach((pad, i) => { pilot.pad(pad, true, 70 + i); assert.deepEqual(voice(pilot, MO + i).notes, [notes[i]]); });
-  assert.equal(pilot.inspect().voices.length, 26); // chord + 8 previews + 16 melody + bass
+  assert.equal(pilot.inspect().voices.length, 18); // chord + 16 melody + bass; steps are written, not previewed
   const ids = pilot.inspect().voices.map(([owner]) => owner);
-  assert.equal(new Set(ids).size, 26);
-  assert.ok(ids.includes(SO + 7) && ids.includes(B));
+  assert.equal(new Set(ids).size, 18);
+  assert.ok(!ids.some(o => o >= SO && o < SO + 16) && ids.includes(B));
   assert.ok(commands.filter(c => c.op === 'on').every(c => c.owner >= 0 && c.owner <= B));
   M.forEach(pad => pilot.pad(pad, false));
-  for (let i = 0; i < 8; i++) assert.ok(voice(pilot, SO + i));
+  for (let i = 0; i < 8; i++) assert.ok(pilot.inspect().progression[i]);
   pilot.panic(); assert.equal(pilot.inspect().voices.length, 0);
 });
 
@@ -92,7 +93,7 @@ test('KEEP and capture use the played variation, not a subsequently prepared var
   assert.equal(chordName(state.progression[0]), 'A7');
 });
 
-test('SCALE and CHROM are fixed across chords, while CHORD follows the played harmony', () => {
+test('held notes stay put across chords in every mode; CHORD re-presses follow the harmony', () => {
   for (const melodyMode of ['chord', 'scale', 'chromatic']) {
     const { pilot, commands } = setup({ melodyMode, melodyFollow: 'pad' });
     pilot.pad(C[0], true); M.forEach(p => pilot.pad(p, true));
@@ -100,12 +101,11 @@ test('SCALE and CHROM are fixed across chords, while CHORD follows the played ha
     const length = commands.length;
     pilot.pad(C[1], true);
     const after = M.map((_, i) => voice(pilot, MO + i)?.notes[0]);
+    assert.deepEqual(after, before);
+    assert.ok(!commands.slice(length).some(c => c.op === 'on' && c.owner >= MO && c.owner < SO));
     if (melodyMode === 'chord') {
-      assert.notDeepEqual(after, before);
-      assert.deepEqual(pcs(after), [2,5,9]);
-    } else {
-      assert.deepEqual(after, before);
-      assert.ok(!commands.slice(length).some(c => c.op === 'on' && c.owner >= MO && c.owner < SO));
+      M.forEach(p => pilot.pad(p, false)); M.forEach(p => pilot.pad(p, true));
+      assert.deepEqual(pcs(M.map((_, i) => voice(pilot, MO + i)?.notes[0])), [2,5,9]);
     }
     pilot.panic();
   }
@@ -242,4 +242,16 @@ test('disarming a running loop clears latched UI voices so edits cannot resurrec
   assert.equal(pilot.inspect().voices.length, 0);
   page('MELODY'); pilot.knob(1, -1);
   assert.equal(pilot.inspect().voices.length, 0);
+});
+test('outside CHORD mode a held melody note is not re-struck when the harmony changes', () => {
+  for (const melodyMode of ['scale','chromatic','pentatonic','blues']) {
+    const { pilot, commands } = setup({ melodyMode, melodyAdapt: true, bassEnabled: false });
+    pilot.pad(C[0], true); pilot.pad(M[2], true); const held=new Map(pilot.inspect().voices).get(10).notes[0];
+    pilot.pad(C[0], false); const n=commands.length;
+    pilot.pad(C[4], true, 100, {}); pilot.pad(92, true); pilot.pad(C[1], true); pilot.pad(92, false);
+    assert.ok(!commands.slice(n).some(c=>c.op==='on'&&c.owner===10), melodyMode);
+    assert.equal(new Map(pilot.inspect().voices).get(10).notes[0], held);
+    pilot.pad(M[2], false); pilot.pad(M[2], true);
+    assert.equal(commands.findLast(c=>c.op==='on'&&c.owner===10).notes[0], melodyNotes(pilot.inspect().active.chord, pilot.inspect().settings)[2]);
+  }
 });

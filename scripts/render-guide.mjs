@@ -46,4 +46,31 @@ for(const [i,name,controls,instrument] of [[0,'CHORD','C.OUT + C.CH','e.g. piano
 routing+=text(32,490,'Set the receiver to the matching route/channel. These are examples, not fixed track assignments.',16);
 routing+=text(32,525,'Separate channels are important when parts use different CC64 sustain behaviour.',16,'#f1cf82');
 await writeFile(dir+'/midi-routing.svg',shell('MIDI / ONE PLAYER, THREE VOICES','Chord, melody and bass each have their own output route and channel leading to a receiving instrument.',560,routing));
+// Shift + step shortcuts, in Move's step positions (printed icons light while Shift is held).
+const shortcuts={2:['MIDI','page'],3:['SETUP','QNT COUNT'],5:['TEMPO','from Move'],6:['METRO','OFF ON REC'],7:['STRUM','menu'],8:['R.PAD','MEL/BASS'],
+  9:['SCALE','key, melody'],10:['FULL','velocity'],13:['Schwung','tools'],14:['NEW','clip'],15:['DOUBLE','loop'],16:['QNT','clip on/off']};
+let shift=text(32,80,'HOLD SHIFT  ·  ICONS UNDER THE STEPS LIGHT  ·  A LIT STEP MEANS THE SETTING IS ON',14,'#9fb3c8');
+for(let i=1;i<=16;i++){
+  const x=32+(i-1)*61,y=118,[name,detail]=shortcuts[i]||['',''],own=!!shortcuts[i]&&i!==13;
+  shift+=box(x,y,52,40,i===13?'#2a2f38':own?'#e3ebf3':'#1b2633')+text(x+26,y+26,String(i),15,own?'#152336':'#7f93a8','text-anchor="middle" class="strong"');
+  if(name){shift+=text(x+26,y+64,name,12,i===13?'#7f93a8':'#f1cf82','text-anchor="middle" class="strong"')+text(x+26,y+82,detail.split(' ')[0],10,'#9fb3c8','text-anchor="middle"');
+    if(detail.split(' ').length>1)shift+=text(x+26,y+96,detail.split(' ').slice(1).join(' '),10,'#9fb3c8','text-anchor="middle"');}
+}
+shift+=text(32,262,'METRO step: blue = ON (while Move plays), red = REC (while recording).',17);
+shift+=text(32,294,'SETUP, STRUM and SCALE open a page of knobs; press the same step or Back to close.',16,'#9fb3c8');
+shift+=text(32,324,'Step 13 stays Schwung\'s tool menu. Positions follow Move where Move has the same function.',16,'#9fb3c8');
+await writeFile(dir+'/shift-steps.svg',shell('SHIFT + STEP / SHORTCUTS','Sixteen step buttons: 2 MIDI, 3 SETUP, 5 tempo, 6 metronome, 7 strum menu, 8 right-hand pads, 9 scale, 10 full velocity, 13 Schwung tools, 14 new clip, 15 double loop, 16 quantize.',356,shift));
+// Clip view (Menu): one pad row per part, eight clip places each.
+let clipsView=text(32,80,'MENU OPENS CLIPS  ·  ONE ROW PER PART  ·  EIGHT CLIP PLACES EACH',14,'#9fb3c8');
+const rows=[['CHORD','#e3ebf3','#152336'],['BASS','#2f5a46','#fff'],['MELODY','#303b63','#fff']];
+for(let row=0;row<4;row++)for(let col=0;col<8;col++){
+  const x=32+col*122+(col>=4?34:0),y=112+row*78,part=rows[row];
+  if(part){const filled=col<3,selected=col===0;
+    clipsView+=box(x,y,110,64,filled?part[1]:'#1b2633',selected?'#f1cf82':'#354557')+text(x+55,y+38,filled?`${part[0]} ${col+1}`:'empty',filled?14:13,filled?part[2]:'#7f93a8','text-anchor="middle" class="strong"');}
+  else clipsView+=box(x,y,110,64,col===7?'#234470':'#141d28')+text(x+55,y+38,col===7?'STOP':'',16,'#fff','text-anchor="middle" class="strong"');
+}
+clipsView+=text(32,440,'Press a clip to play it (queued to the next bar while playing). Yellow outline: the clip that plays.',16);
+clipsView+=text(32,470,'Copy + clip, then another clip: copy. Delete + clip: clear. Track 1/2/3 shows that part\'s steps.',16,'#9fb3c8');
+clipsView+=text(32,500,'Knobs: LEN, RATE, QNT (this clip), PAGE, COUNT, METRO.',16,'#9fb3c8');
+await writeFile(dir+'/clip-view.svg',shell('CLIPS / CHORDS, BASS AND MELODY','Clip view: top pad row chord clips, second row bass clips, third row melody clips, bottom-right pad STOP.',530,clipsView));
 console.log('Rendered guide diagrams: '+labels.join(', '));

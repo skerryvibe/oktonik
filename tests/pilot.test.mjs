@@ -1,14 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createPilot, CHORD_PADS, MELODY_PADS, PAGES } from '../src/pilot.mjs';
-import { decodeDocument } from '../src/settings.mjs';
+import { decodeDocument, encodeDocument } from '../src/settings.mjs';
 
 function harness(initial = {}) {
   const commands = [];
   const frames = [];
   const writes = [];
   const pilot = createPilot({
-    read: () => initial.text || null,
+    read: () => initial.text || encodeDocument({bassEnabled:false,bassGesture:false}, []),
     write: (path, text) => { writes.push({ path, text }); return true; },
     send: command => commands.push(command),
     render: model => frames.push(model),
@@ -29,7 +29,7 @@ test('PLAY starts with the map; HARMONY keeps eight knob positions', () => {
   assert.equal(state.model.pageName, 'CHORDS');
   assert.equal(state.model.cells.length, 8);
   assert.deepEqual(state.model.cells.map(cell => cell.fullLabel), [
-    'Key', 'Scale', 'Extension', 'Chord octave', 'Spread', 'Voice leading', 'Strum', 'Chord sustain',
+    'Key', 'Chord octave', 'Extension', 'Scale', 'Spread', 'Voice leading', 'Strum', 'Chord sustain',
   ]);
   assert.ok(frames.length >= 1);
 });
@@ -55,16 +55,16 @@ test('left lower pads play chords and right lower pads play melody simultaneousl
   assert.ok(commands.filter(command => command.op === 'off').length >= 2);
 });
 
-test('steps, capture and loop changes share the same active harmony', () => {
+test('steps and loop changes share the same active harmony', () => {
   const { pilot, commands } = harness();
   pilot.init();
   pilot.pad(CHORD_PADS[0], true);
   pilot.pad(CHORD_PADS[0], false);
   pilot.step(0, true, { shift: true });
   assert.equal(pilot.inspect().progression.filter(Boolean).length, 1);
-  pilot.capture();
   pilot.pad(CHORD_PADS[1], true);
   pilot.pad(CHORD_PADS[1], false);
+  pilot.step(1,true,{shift:true});pilot.step(1,false);
   assert.equal(pilot.inspect().progression.filter(Boolean).length, 2);
   pilot.step(0, true);
   pilot.step(0, false);
@@ -89,7 +89,7 @@ test('pages and knob changes are readable and persisted', () => {
   pilot.changePage(PAGES.indexOf('SEQ') - pilot.inspect().page);
   assert.equal(pilot.inspect().model.pageName, 'SEQ');
   pilot.knob(1, 1);
-  assert.equal(pilot.inspect().settings.rate, 3);
+  assert.equal(pilot.inspect().clips.parts.chord.clips[0].rate, 3);
   pilot.changePage(1);
   assert.equal(pilot.inspect().model.pageName, 'MIDI');
   pilot.changePage(PAGES.indexOf('THEORY') - pilot.inspect().page);
@@ -99,7 +99,7 @@ test('pages and knob changes are readable and persisted', () => {
   assert.ok(writes.length >= 1);
   const decoded = decodeDocument(JSON.parse(writes.at(-1).text));
   assert.equal(decoded.settings.extension, 1);
-  assert.equal(decoded.settings.rate, 3);
+  assert.equal(decoded.clips.parts.chord.clips[0].rate, 3);
 });
 
 test('legacy settings import is read into the new state format', () => {

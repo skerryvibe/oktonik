@@ -97,13 +97,19 @@ export function createProjectPilot(io = {}) {
       const changed = refresh();
       pilot?.tick(changed || waiting ? null : dsp, parked);
     },
-    resume() { if (!refresh(true) && !waiting) pilot?.resume(); },
+    resume() {
+      parked=false;
+      // A project change may attach a new pilot; it too must be active before
+      // the first input, not wait for a later hardware tick to unpark it.
+      refresh(true);
+      if (!waiting) pilot?.resume();
+    },
     unload() { pilot?.unload(); for (const entry of [...pending]) write(...entry); },
     inspect() { const state = pilot.inspect(); return { ...state, model: decorate(state.model),
       project: project && { ...project }, projectWaiting: waiting, pendingProjectSaves: pending.size }; },
   };
-  for (const method of ['pad', 'pressure', 'step', 'knob', 'focus', 'shift', 'changePage', 'octave', 'repaint', 'panic',
-    'selectEdit', 'resetEdit', 'keepVariation', 'capture', 'record', 'undo', 'arm', 'play', 'menu']) {
+  for (const method of ['mute', 'pad', 'pressure', 'chordPressure', 'step', 'knob', 'focus', 'shift', 'changePage', 'browse', 'pageSteps', 'octave', 'repaint', 'panic',
+    'selectEdit', 'resetEdit', 'keepVariation', 'capture', 'record', 'recordContext', 'track', 'undo', 'arm', 'play', 'menu', 'back', 'copyHeld', 'mainButton', 'nativeRecord', 'loop', 'shiftStep']) {
     session[method] = (...args) => {
       const changed = refresh();
       if (!waiting && !changed) return pilot?.[method](...args);

@@ -1,5 +1,82 @@
 # Chord Pilot: stegvis portabel kärna
 
+## Lab .11: opt-in stable ensemble allocation
+
+`dsp/divisi.h::ensemble_assign` is a bounded, allocation-free minimum-distance
+matching of supplied notes to eight logical voice IDs. It does not change pitches.
+`LEAD` still chooses voicings in theory. Initial ties assign voices low-to-high;
+later assignments minimize total semitone motion, with cost 128 for unused voices.
+Silent voices retain their last pitch; voices may cross. No instrument register
+limits, fixed-size orchestration, doubling or voice-specific expression yet.
+The caller supplies unique MIDI notes and count 1..8.
+
+DSP snapshots the resulting MIDI channels into the existing Voice ownership.
+Live harmony (across pad owners) and sequencer have separate transient memories.
+Release sends no new notes and retains history. Panic/STOP/config rerouting clears
+it; an on-command's changed map/route also resets history before matching.
+Duplicate output channels remain allowed, but cannot give independent MIDI voices.
+Existing retained-note/strum/pedal/pressure/retry code uses actual note+channel.
+
+Lab Shift+CHORD knob 5 VOICE RANK/SMTH selects optional `ensembleSmooth` (default
+false within schema 7); knob 7 DIV OFF/NOTE still enables distribution. Protocol
+`divisi:2` selects stable matching, `1` keeps rank behavior, `0` remains off.
+Pedal membership remains the union of the full eight-channel map. Public never
+sends mode 1/2, including when opening settings written with Lab options.
+
+## Lab .8: signed inversions
+
+`chordNotes` accepts signed inversion intent. Negative inversion moves the
+highest k source tones below the rest using a shared octave displacement,
+preserving their spacing and pitch classes before spread and MIDI-range fitting.
+Positive inversion output is unchanged. Serialized chords/overrides accept
+-7..7; the edit control bounds the effective value by actual tone count.
+AUTO uses `lockInversion:false`, not a numeric sentinel. EDIT Shift+INV clears
+the lock; negative manual inversion is therefore independent of automatic
+voice leading. No new schema or DSP protocol is introduced.
+MELODY/BASS extras use the existing view-only Shift layer; routing and musical
+parameters are not duplicated or rebound just because the layer opens.
+
+## Lab .7: extra views and ensemble routing
+
+`EXTRA_PAGES` binds a parent page to a temporary control view. `shift(held)`
+changes only view state; the Move adapter translates the physical modifier.
+EDIT, project transitions and co-run reset/override the layer. No settings
+schema or musical state is tied to Shift being held.
+
+Settings `ensembleChannels[8]` stores zero-based channels, normalized to 0–15.
+Without the field, the old C.CH series is preserved. `on`, `config`, `pedal`
+accept an optional fixed-length `channels` array. Parsing rejects invalid
+length/range atomically, but preserves duplicates. `config` stores the loop map;
+live commands snapshot it. Pedal membership is the union of mapped channels.
+Legacy commands without a map retain consecutive-channel behavior.
+
+## Lab .5–.7: pitch-rank divisi
+
+`dsp/divisi.h` fördelar unika toner på kanaler efter tonhöjdsrang utan Move-
+eller transportberoenden. Tonernas arrayordning bevaras för strum. DSP Voice
+sparar `channels[]` per ton; notägande, tryck, legato och release använder denna
+adress, inte bara Voice.channel. Legato behåller endast samma ton OCH kanal.
+`on.divisi` styr live-ackord; `config.divisi` styr loopackord. Melodi/bas/ARP
+använder fortfarande en enda kanal. Controllern stoppar live-noter vid kanalbyte.
+Från .7 väljer varje stämma egen kanal; `pedal.divisi` för chord-owner 0 äger CC64
+över de valda kanalerna; andra pedalägare delar den befintliga bitmasken.
+Settings-fältet divisi är valfritt, default false, schema 7. Public ignorerar det.
+Detta är inte persistent röstmatchning; sådan logik ska senare tillkomma som
+en musikalisk fördelare, inte genom Move-knappar eller displayberoenden.
+
+## Lab .4: uttryck och notägande
+
+Move-adaptern översätter poly pressure till `pressure(logicalMelodyIndex, value)`.
+Controllern samlar senaste värdet per hållen ingång till nästa UI-tick och skickar
+`{op: 'pressure', owner, pressure}`. DSP väljer ägarens faktiska toner, kanal och
+destination; fysisk padpitch får aldrig användas som utgående notnummer.
+Tryckåterställning ingår i DSP:s release/revoice/kill-livscykel och misslyckad
+MIDI-utmatning återförsöks. Delade pitch/kanal-destinationer använder högsta
+ägda tryckvärdet. Det är MIDI:s gemensamma uttrycksadress, inte oberoende MPE.
+Opt-in-inställningen `melodyAftertouch` är valfri inom schema 7 och default false.
+Public ignorerar tryckinput; Lab har AT på MELODY. Framtida divisi behöver stabila
+röstidentiteter och separata kanaler för oberoende uttryck mellan ensemble-delar.
+
 Move/Schwung är produktionsplattformen. M4L/Push utvecklas inte i beta.12.
 
 - `theory.mjs`: rena skalor, ackord, voicings, modifierare, meloditonval och namn.

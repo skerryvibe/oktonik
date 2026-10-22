@@ -25,10 +25,9 @@ compile() {
   fi
 }
 
-COMMON="-std=c11 -O2 -Wall -Wextra -Werror -I$ROOT/src/vendor"
-# shellcheck disable=SC2086
-compile $COMMON -fPIC -fvisibility=hidden -shared "$ROOT/src/dsp/chord_pilot.c" -o "$ROOT/dist/dsp.so"
-compile $COMMON "$ROOT/src/install_swap.c" -o "$ROOT/dist/install-swap"
+set -- -std=c11 -O2 -Wall -Wextra -Werror -I"$ROOT/src/vendor"
+compile "$@" -fPIC -fvisibility=hidden -shared "$ROOT/src/dsp/chord_pilot.c" -o "$ROOT/dist/dsp.so"
+compile "$@" "$ROOT/src/install_swap.c" -o "$ROOT/dist/install-swap"
 
 for artifact in "$ROOT/dist/dsp.so" "$ROOT/dist/install-swap"; do
   artifact_type=$(file -b "$artifact")

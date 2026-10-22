@@ -48,7 +48,8 @@ test('explicit bass snapshots and per-pad choices survive reload, while AUTO/ROO
   h.choose(0,40);h.play(0);assert.deepEqual(h.pilot.inspect().loopBass[15],[35]);
   h.pilot.unload();const restored=createPilot({read:p=>h.files.get(p)});restored.init();
   restored.pad(C[0],true);assert.deepEqual(new Map(restored.inspect().voices).get(B).notes,[40]);
-  restored.step(15,true);assert.deepEqual(new Map(restored.inspect().voices).get(B).notes,[35]);
+  restored.pad(C[0],false);restored.step(15,true);assert.deepEqual(new Map(restored.inspect().voices).get(B).notes,[40]);
+  assert.equal(restored.inspect().progression[15].snapshot.bass,35);
   assert.equal(restored.inspect().model.chordLabel,'C/B');
   h.pilot.selectEdit(0);h.turn('bassMode',-63);assert.equal(h.pilot.inspect().bank[0].bassMode,'auto');
   h.turn('bassMode',1);assert.equal(h.pilot.inspect().bank[0].bassMode,'root');

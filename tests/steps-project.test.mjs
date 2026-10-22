@@ -21,24 +21,25 @@ function setup(settings = {}, project = false, initialId = 'set-A') {
   return { pilot,files,commands,leds,frames,page,turn,advance, fail: value => {fail=value;} };
 }
 
-test('all 16 steps save, preview, capture, clear and persist without owner collisions', () => {
+test('all 16 steps save, preview, clear and persist without owner collisions', () => {
   const {pilot,files,commands}=setup({bassEnabled:true,autoSustain:true,melodyOctave:-1});
   for (let i=0;i<16;i++) {
     pilot.pad(C[i%8],true); pilot.pad(C[i%8],false); pilot.step(i,true,{shift:true}); pilot.step(i,false);
   }
   assert.equal(pilot.inspect().progression.filter(Boolean).length,16);
   for (let i=0;i<16;i++) {
+    const bassBefore=new Map(pilot.inspect().voices).get(B)?.notes;
     pilot.step(i,true);
     assert.deepEqual(new Map(pilot.inspect().voices).get(S+i).notes,pilot.inspect().progression[i].snapshot.notes);
     pilot.pad(M[15],true); assert.ok(new Map(pilot.inspect().voices).has(23));
-    assert.ok(new Map(pilot.inspect().voices).has(B));
+    assert.deepEqual(new Map(pilot.inspect().voices).get(B)?.notes,bassBefore); // No extra bass; held live bass survives.
     pilot.pad(M[15],false); pilot.step(i,false);
   }
   assert.equal(S+15,39); assert.equal(B,40);
   pilot.unload(); assert.equal(decodeDocument(JSON.parse(files.get(STATE_PATH))).progression.filter(Boolean).length,16);
   for (const invalid of [-1,16,1.5,NaN]) { const n=commands.length;pilot.step(invalid,true);assert.equal(commands.length,n); }
   pilot.step(15,true,{delete:true}); assert.equal(pilot.inspect().progression[15],null);
-  pilot.capture(); pilot.pad(C[1],true); pilot.pad(C[1],false);
+  pilot.pad(C[1],true); pilot.pad(C[1],false);pilot.step(15,true,{shift:true});pilot.step(15,false);
   assert.ok(pilot.inspect().progression[15]); assert.equal(pilot.inspect().capture,false);
 });
 
@@ -55,12 +56,13 @@ test('stored steps freeze actual voicing, key, bass, strum and lead through glob
   page('PLAY'); // BASS now addresses the separate bass lane, not chord previews.
   pilot.step(15,true);
   assert.deepEqual(new Map(pilot.inspect().voices).get(S+15).notes,played);
-  assert.deepEqual(new Map(pilot.inspect().voices).get(B).notes,[saved.snapshot.bass]);
+  assert.ok(!new Map(pilot.inspect().voices).has(B));
+  assert.equal(commands.findLast(c=>c.op==='slot'&&c.index===15).bass,saved.snapshot.bass);
   const on=commands.findLast(c=>c.op==='on' && c.owner===S+15);
   assert.equal(on.strum_ms,20);assert.equal(on.legato,1);
   assert.match(pilot.inspect().model.chordLabel,/^F/);
-  // Even a held step ignores further global edits; melody follows its saved key.
-  page('CHORDS');turn('key',1);turn('spread',-2);
+  // Holding any occupied step now opens its editor. Release before global edits.
+  pilot.step(15,false);page('CHORDS');turn('key',1);turn('spread',-2);pilot.step(15,true);
   assert.deepEqual(new Map(pilot.inspect().voices).get(S+15).notes,played);
   pilot.pad(M[0],true);assert.equal(new Map(pilot.inspect().voices).get(8).notes[0]%12,5);
   pilot.step(14,true,{shift:true});assert.deepEqual(pilot.inspect().progression[14],saved);
@@ -69,18 +71,17 @@ test('stored steps freeze actual voicing, key, bass, strum and lead through glob
   assert.deepEqual(restored.inspect().loopNotes[15],played);assert.deepEqual(restored.inspect().progression[15],saved);
 });
 
-test('S.VEL is bounded, persistent and controls preview and all loop slots without changing pitches', () => {
+test('velocity is edited per step; SEQ no longer spends controls on REC or global S.VEL', () => {
   const {pilot,page,turn,commands,files}=setup();pilot.step(0,true,{shift:true});pilot.step(15,true,{shift:true});
   const before=structuredClone(pilot.inspect().progression);
-  page('SEQ');turn('stepVelocity',-63);turn('stepVelocity',-63);
-  assert.equal(pilot.inspect().settings.stepVelocity,1);pilot.step(15,true,{},127);
-  assert.equal(commands.findLast(c=>c.op==='on'&&c.owner===39).velocity,1);
+  page('SEQ');assert.ok(pilot.inspect().model.cells.every(c=>!['stepVelocity','record'].includes(c.id)));
+  pilot.step(15,true);turn('eventVelocity',-63);turn('eventVelocity',-63);
   assert.equal(commands.findLast(c=>c.op==='slot'&&c.index===15).velocity,1);
-  pilot.step(15,false);turn('stepVelocity',63);turn('stepVelocity',63);
-  assert.equal(pilot.inspect().settings.stepVelocity,127);pilot.step(0,true,{},1);
-  assert.equal(commands.findLast(c=>c.op==='on'&&c.owner===S).velocity,127);
-  assert.deepEqual(pilot.inspect().progression,before);
-  pilot.unload();assert.equal(decodeDocument(JSON.parse(files.get(STATE_PATH))).settings.stepVelocity,127);
+  pilot.step(15,false);pilot.step(15,true);
+  assert.equal(commands.findLast(c=>c.op==='on'&&c.owner===39).velocity,1);
+  turn('eventVelocity',63);turn('eventVelocity',63);
+  assert.deepEqual(pilot.inspect().progression[0],before[0]);
+  pilot.unload();assert.equal(decodeDocument(JSON.parse(files.get(STATE_PATH))).progression[15].timing.velocity,127);
 });
 
 test('semantic melody colors agree across all modes, adaptive chords and HOLD press/release', () => {
@@ -90,7 +91,7 @@ test('semantic melody colors agree across all modes, adaptive chords and HOLD pr
       if(modifier)pilot.pad(modifier,true);pilot.pad(C[1],true);if(modifier)pilot.pad(modifier,false);
       const {active,settings}=pilot.inspect(), pitches=melodyNotes(active.chord,settings), root=active.chord.rootOffset;
       const pcs=active.chord.intervals.map(n=>(n+root)%12), scale=adaptiveScaleIntervals(active.chord,settings);
-      pilot.repaint();const before=new Map(leds.at(-1).map(l=>[l.note,l.role]));
+      pilot.repaint();const before=new Map(leds.at(-1).filter(l=>!l.button).map(l=>[l.note,l.role]));
       M.forEach((pad,i)=>{
         const pc=pitches[i]%12;
         assert.equal(before.get(pad),pc===root?'root':pcs.includes(pc)?'chordTone':scale.includes(pc)?'scaleTone':'chromatic');

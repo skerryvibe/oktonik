@@ -5,7 +5,7 @@ import { buildChordBank, chordNotes, melodyNotes, bassNotes } from '../src/theor
 import { STATE_PATH, encodeDocument, decodeDocument } from '../src/settings.mjs';
 
 function setup(settings = {}) {
-  const commands = [], files = new Map([[STATE_PATH, encodeDocument(settings, [])]]);
+  const commands = [], files = new Map([[STATE_PATH, encodeDocument({bassEnabled:false,bassGesture:false,...settings}, [])]]);
   const pilot = createPilot({ read: p => files.get(p), write: (p, text) => { files.set(p, text); return true; },
     send: c => commands.push(c), moveAvailable: true });
   pilot.init();
@@ -14,12 +14,13 @@ function setup(settings = {}) {
 }
 const voices = p => new Map(p.inspect().voices);
 
-test('new melody strikes request retrigger while automatic revoicing does not', () => {
+test('new melody strikes retrigger while a chord change leaves the held note alone', () => {
   const { pilot, commands } = setup();
   pilot.pad(68, true); pilot.pad(72, true);
   assert.equal(commands.filter(c => c.op === 'on' && c.owner === 8).at(-1).retrigger, 1);
+  const strikes = commands.filter(c => c.op === 'on' && c.owner === 8).length;
   pilot.pad(69, true);
-  assert.equal(commands.filter(c => c.op === 'on' && c.owner === 8).at(-1).retrigger, 0);
+  assert.equal(commands.filter(c => c.op === 'on' && c.owner === 8).length, strikes);
   pilot.pad(72, false); pilot.pad(72, true);
   assert.equal(commands.filter(c => c.op === 'on' && c.owner === 8).at(-1).retrigger, 1);
 });
@@ -44,10 +45,10 @@ test('auto sustain holds chord, melody and bass until the next chord, then relea
 test('turning sustain off stops only released notes; held notes keep playing', () => {
   const { pilot, page } = setup({ autoSustain: true, bassEnabled: true });
   pilot.pad(68, true); pilot.pad(72, true); pilot.pad(72, false);
-  page('MELODY'); pilot.knob(4, -1);
+  page('MELODY'); pilot.knob(7, -1);
   assert.equal(voices(pilot).has(8), false);
   assert.ok(voices(pilot).has(0) && voices(pilot).has(B));
-  page('CHORDS');pilot.knob(7,-1);page('BASS');pilot.knob(5,-1);
+  page('CHORDS');pilot.knob(7,-1);page('BASS');pilot.knob(7,-1);
   pilot.pad(68, false);
   assert.equal(pilot.inspect().voices.length, 0);
 });
@@ -73,7 +74,7 @@ test('independent octaves transpose held and sustained melody without moving the
   assert.equal(voices(pilot).get(8).notes[0], melody + 12);
   pilot.pad(72, false); pilot.knob(1, 1);
   assert.equal(voices(pilot).get(8).notes[0], melody + 24);
-  page('CHORDS'); pilot.knob(3, -1);
+  page('CHORDS'); pilot.knob(1, -1);
   assert.deepEqual(voices(pilot).get(0).notes, chord.map(n => n - 12));
   assert.equal(voices(pilot).get(8).notes[0], melody + 24);
 });
@@ -82,7 +83,7 @@ test('octaves remain independent with voice leading enabled', () => {
   const { pilot, page } = setup({ voiceLead: true });
   pilot.pad(68, true); pilot.pad(71, true); pilot.pad(72, true);
   const melody = voices(pilot).get(8).notes;
-  page('CHORDS'); pilot.knob(3, 1);
+  page('CHORDS'); pilot.knob(1, 1);
   assert.deepEqual(voices(pilot).get(8).notes, melody);
   assert.equal(pilot.inspect().settings.melodyOctave, 0);
 });
@@ -140,7 +141,7 @@ test('v2 migration inherits old melody octave and routing and preserves edited c
   const state = decodeDocument(previous);
   assert.equal(state.settings.melodyOctave, -1);
   assert.equal(state.settings.melodyRoute, 'both'); assert.equal(state.settings.melodyChannel, 3);
-  assert.equal(state.settings.autoSustain, false); assert.equal(state.settings.bassEnabled, false);
+  assert.equal(state.settings.autoSustain, false); assert.equal(state.settings.bassEnabled, true); // bass is on by default since rc.4
   assert.equal(state.settings.melodyRetrigger, true);
   assert.equal(state.overrides[0].extension, 4); assert.ok(state.progression[0]);
 });
