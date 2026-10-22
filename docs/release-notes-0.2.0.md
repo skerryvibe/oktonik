@@ -32,4 +32,4 @@ Move projects before updating. Tested with Schwung 1.7.3.
 ## Install
 
 Download **oktonik-module.tar.gz** below, upload it at `move.local:7700` and
-restart Move. See the [guide](docs/oktonik-public.md) for everything else.
+restart Move. See the [guide](https://github.com/skerryvibe/oktonik/blob/main/docs/oktonik-public.md) for everything else.
