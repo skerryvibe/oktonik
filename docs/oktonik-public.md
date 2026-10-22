@@ -1,9 +1,10 @@
 # OKTONIK user guide
 
 **Harmonic performance instrument · by Skerry Vibe**  
-For **0.1.0** on Ableton Move / Schwung **1.6.2+**.
+For **0.2.0** on Ableton Move / Schwung **1.7.3**.
 
-One player, three musical parts: chords, melody and bass. OKTONIK generates
+One player, three musical parts: chords, melody and bass. Play them live,
+record them into clips and edit them on the step buttons. OKTONIK generates
 MIDI notes; your Move tracks or external instruments provide the sound.
 
 [Published releases](https://github.com/skerryvibe/oktonik/releases) ·
@@ -14,217 +15,333 @@ MIDI notes; your Move tracks or external instruments provide the sound.
 - [Install](#install)
 - [Your first jam](#your-first-jam)
 - [Learn the pad surface](#learn-the-pad-surface)
-- [Navigate the five pages](#navigate-the-five-pages)
+- [Find your way around](#find-your-way-around)
+- [Chords](#chords)
 - [Explore with modifiers](#explore-with-modifiers)
-- [Play a moving bass line](#play-a-moving-bass-line)
-- [Melody modes and colours](#melody-modes-and-colours)
 - [Edit one chord](#edit-one-chord)
+- [Melody](#melody)
+- [Bass](#bass)
+- [Record a loop](#record-a-loop)
+- [Clips](#clips)
+- [Steps](#steps)
+- [Shift + step shortcuts](#shift--step-shortcuts)
+- [Count-in, metronome and quantize](#count-in-metronome-and-quantize)
 - [Sustain and stopping notes](#sustain-and-stopping-notes)
 - [Route your instruments](#route-your-instruments)
 - [Troubleshooting and saves](#troubleshooting-and-saves)
 
 ## Install
 
-1. Install Schwung 1.6.2 or newer on Move. Back up your projects.
-2. Download **oktonik-module.tar.gz** from the published release.
-   The manually distributed test package was named **oktonik-public-0.1.0.tar.gz**.
-3. Open `move.local:7700` and upload the compressed archive through Schwung.
-   Do not choose GitHub's **Source code** downloads.
-4. Restart Move and select **OKTONIK**.
-5. Select a receiving instrument and match its MIDI route/channel to OKTONIK's MIDI page.
+1. Install Schwung 1.7.3 on Move. Back up your Move projects.
+2. Download **oktonik-module.tar.gz** from the
+   [releases page](https://github.com/skerryvibe/oktonik/releases). Do not
+   choose GitHub's **Source code** downloads.
+3. On the same Wi-Fi, open `move.local:7700` and upload the compressed archive.
+4. Restart Move, so that the new version and its audio part are loaded.
+5. Open **OKTONIK** from Schwung's tools (Shift + step 13).
+6. On OKTONIK's **MIDI** page, match routes and channels to your instruments.
 
-This guide covers the module, not installation of Schwung itself. Host setup
-and available destinations depend on your installed Schwung version.
+OKTONIK Lab, if installed, is a separate module with its own settings.
+Returning to 0.1.0 can lose clips and newer settings; restore a backup instead.
 
 ## Your first jam
 
-Start with a piano or another clearly audible instrument. You do not need to
-press Move's Play button for live chords and melody.
+Start with a piano or another clearly audible instrument. Live chords and
+melody need no transport: you do not need to press Play.
 
-1. On **CHORD**, choose C major, the triad extension, SPRD CLOSE, LEAD OFF,
-   SUST OFF and STRUM 0 for simultaneous attacks.
-2. On **MELODY**, choose MODE SCALE, M.OCT -1, ADAPT ON and SUST OFF.
-3. Go to **PLAY**. Play C, F, then G with the lower-left pads. Add a melody on
-   the right-hand pads and listen to how it fits the harmony.
-4. Hold **SUS4**, play C, release both pads, then play C again. A modifier
-   prepares a variation; pressing it alone does not play or change a held chord.
-5. Turn on BASS and try [Bass Gesture](#play-a-moving-bass-line) when ready.
-
-Previously edited pads may differ from these examples. RESET in EDIT returns
-an individual pad to the global settings.
+1. On **PLAY**, set KEY C, SCALE MAJOR, EXT TRIAD, LEAD OFF, SUST OFF.
+2. Play C, F, then G with the lower-left pads. Add a melody with the
+   right-hand pads; it follows the harmony.
+3. Hold **SUS4**, play C, release both, then play C again. A modifier prepares
+   the next chord; pressing it alone changes nothing that already sounds.
+4. Bass and bass gesture are on in a new project. Hold C and press Em: only the
+   bass moves (C/E). Release all chord pads before the next chord.
+5. When you like a progression, [record it](#record-a-loop).
 
 ## Learn the pad surface
 
 ![Physical 4-by-8 pad layout, viewed from the player's position](images/pad-layout.svg)
 
-*Schematic, not a hardware photograph. Chord names show C major triads without
-edits/modifiers. Melody numbers are playing order, not fixed pitches.*
+*Schematic, not a photograph. Chord names show C major triads without edits.
+Melody numbers are playing order, not fixed pitches.*
 
-- **Lower-left eight pads:** chords, left to right starting at the bottom.
-  The upper C repeats the tonic in a higher register.
-- **Upper-left seven pads:** modifiers. **STOP** is directly above SUS4.
-- **All sixteen right-hand pads:** melody, ascending from the bottom row.
-- The small step buttons are not used for programming in this preview.
+- **Lower-left eight pads:** chords, left to right from the bottom row. The
+  upper C repeats the tonic higher up.
+- **Upper-left seven pads:** modifiers; each can be reassigned. **STOP**
+  (directly above SUS4) is fixed.
+- **Sixteen right-hand pads:** melody, ascending from the bottom row, or bass
+  when R.PAD is set to BASS.
+- **Sixteen step buttons:** the steps of the part you are editing, and Shift
+  shortcuts.
 
-PLAY mirrors the two rows of chord pads. Holding a modifier immediately previews
-the chords those pads would play. The header names the active chord. During
-Bass Gesture, the grid still shows chord choices, not a grid of slash chords.
+PLAY shows the chord pads as a map of chord names. Holding a modifier previews
+what each pad would play. The header names the sounding chord; the footer shows
+the key and the chord's function, for example `C Major | V`.
 
-## Navigate the five pages
+## Find your way around
 
-Turn the **large main encoder** to change page, or use **Menu** to advance.
-On parameter pages, the upper display row is knobs **1–4** and the lower row is
-knobs **5–8**, left to right. Touch/turn a knob for its fuller description in
-the footer. Blank cells have no control.
+The display has eight cells: knobs 1–4 on the upper row, 5–8 on the lower row.
+Touch or turn a knob to see its full name and value in the footer. A cell with
+`--` is inactive in the current mode; its footer says why.
 
-![Five pages and chord editor rendered by OKTONIK's actual display code](oktonik-public-preview.svg)
+![Real OKTONIK screens: PLAY, CHORD, MELODY, BASS, MIDI and chord edit](oktonik-public-preview.svg)
 
-*Enlarged real 128 × 64 UI renderings, not photographs. Your saved values may differ.*
+*Enlarged real 128 × 64 renderings from OKTONIK's display code. Your values may differ.*
 
-### CHORD
+| Control | Does |
+| --- | --- |
+| Main encoder | PLAY → EXT PROF → MOD PADS → MIDI. On a Track page: that part's extra pages. |
+| Track 1 / 2 / 3 | CHORD, BASS, MELODY pages for that part, and its steps. |
+| Menu | Clip view. |
+| Back | Close the current editor or view; at the top, leave OKTONIK. |
+| Shift + step | [Shortcuts](#shift--step-shortcuts). |
+| Shift + Track 1–4 | Open that Schwung chain; pads keep playing OKTONIK. |
+| Mute + Track 1/2/3 | Mute chords, bass or melody. |
+
+**Main pages.** From PLAY, turn the main encoder to EXT PROF and MOD PADS, which
+shape the chords on the pads, then MIDI. The pads keep playing chords on all of
+them; Back returns to PLAY.
+
+**Track pages.** Track 1 has CHORD; Track 2 has BASS and B.EXTRA; Track 3 has
+MELODY. Turn the main encoder to move between them. Press the same Track button
+again, or Back, to return to PLAY.
+
+**Schwung chains (co-run).** Shift + Track 1–4 opens that chain. Knobs edit the
+synth or effect; OKTONIK's pads keep playing. Back goes up through the chain
+views and then returns to OKTONIK. STOP still works.
+
+## Chords
+
+PLAY and CHORD (Track 1) share the same eight controls:
 
 | Knob | Label | What it changes |
 | --- | --- | --- |
-| 1 | KEY | Global tonic / key centre. |
-| 2 | SCALE | Scale used to build the chord bank. |
-| 3 | EXT | Global chord extension, such as triads or sevenths. |
-| 4 | OCT | Chord register. |
-| 5 | SPRD | CLOSE, OPEN or WIDE voicing. |
-| 6 | LEAD | Automatic voice leading between chords. |
-| 7 | STRUM | Spacing between chord tones in milliseconds. Zero plays together. Direction defaults to UP. |
-| 8 | SUST | Chord sustain: OFF, HOLD or PEDAL. |
+| 1 | KEY | Tonic / key centre. |
+| 2 | OCT | Chord register. |
+| 3 | EXT | Extension for all pads (TRIAD, 7TH, 9TH …), or the active profile. |
+| 4 | SCALE | Scale of the chord bank. |
+| 5 | SPRD | CLOSE (within an octave), OPEN (second voice lifted an octave) or WIDE (bass alone, the rest spaced above it, about two octaves in all). With LEAD on, OPEN and WIDE keep the root in the bass and voice-lead the upper notes. |
+| 6 | LEAD | Voice leading between chords: OFF, CNTR (stays near OCT) or FREE (may drift about an octave). Only the root, third or fifth goes in the bass. |
+| 7 | STRUM | Spacing between chord notes in ms; 0 plays them together. |
+| 8 | SUST | OFF, HOLD or PEDAL. |
 
-Per-pad overrides can take precedence over global settings. LEAD changes the
-voicing, not the chord identity; a fixed pad inversion overrides its choice.
-STRUM here is a staggered attack, not a rhythmic pattern.
+More pages for the chords:
 
-STRUM is a single control: upward note spacing, without random timing or
-velocity. It affects the next chord attack. Public has no Shift menu pages.
+- **MOD PADS** (main encoder from PLAY): the cells mirror the modifier pads; turn a knob to assign that
+  pad's function. You can also hold Shift and press a modifier pad. Knob 4
+  (where the STOP pad would be) is APPR: BASIC or PROF colours the II, V and
+  SUB approaches with the extension profile.
+- **EXT PROF** (main encoder, right after PLAY): knob 4 picks a style, ordered from plain to rich, or GLOBAL
+  (uses EXT) and CUSTOM (your own extension per scale degree). A pad's own edit
+  wins. Minor scales use each style's minor version.
 
-On **MELODY**, turn knob 6 **AT** to POLY to enable melody
-polyphonic aftertouch. Default is OFF. Pressure follows the held melody note
-and clears when you release it, including with sustain. The receiving synth
-must support polyphonic key pressure. This is not MPE or chord aftertouch.
+| Style | In C major |
+| --- | --- |
+| POP | Cadd9 · Dm · Em · Fadd9 · Gsus4 · Am(add9) · Bdim |
+| CLAS | C · Dm7 · Em · F · G7 · Am · Bdim7 |
+| 7THS | Cmaj7 · Dm7 · Em7 · Fmaj7 · G7 · Am7 · Bm7b5 |
+| LOFI | C6/9 · Dm7 · Em · Fmaj9 · G7sus4 · Am7 · Bm7b5 |
+| SOUL | C6/9 · Dm7 · Em7 · Fmaj7 · G7sus4 · Am7 · Bm7b5 |
+| NEO | Cmaj9 · Dm11 · Em7 · Fmaj9 · G9sus4 · Am9 · Bm7b5 |
+| JAZZ | C6/9 · Dm9 · Em7 · Fmaj9 · G13 · Am9 · Bm7b5 |
+| ALT | Cmaj9 · Dm11 · Em7 · Fmaj9#11 · G7b9 · Am9 · Bm7b5 |
+| BOSSA | C6/9 · Dm7 · Em7 · F6/9 · G9 · Am9 · Bm7b5 |
+| GOSPL | C6/9 · Dm9 · E7 · Fmaj9 · G9sus4 · Am7 · Bdim7 |
+| BLUES | C7 · Dm7 · Em7 · F7 · G7 · Am7 · Bm7b5 |
+| AMB | Csus2 · Dsus2 · E5 · Fsus2 · Gsus4 · Asus2 · Bm7b5 |
 
-### Edit Schwung instruments without leaving the performance
-
-**Shift + Track 1-4** opens that Schwung chain. Knobs edit the visible synth
-or effect; OKTONIK pads continue playing. Back first returns through the
-instrument/effect views to the chain, then returns to OKTONIK. STOP remains
-available. This needs official Schwung 1.6.2+; no custom host patch is needed.
-Co-run does not make OKTONIK a chain MIDI FX module.
-
-On PLAY, the idle footer keeps the active chord and harmonic function visible.
-Parameter edits, modifier previews and STOP temporarily take priority.
-
-### MELODY
-
-Knobs 1–5: **MODE**, **M.OCT**, **ADAPT**, **TRACK**, **SUST**.
-ADAPT works in SCALE mode; TRACK works in CHORD mode. Disabled controls show
-`--` with a hint explaining why.
-
-### BASS
-
-Knobs 1–7: **BASS** on/off, **B.OCT**, **B.VEL**, **B.NTE**, **GEST**, **SUST**, **VEL**.
-
-- B.NTE **ROOT** follows the chord root, regardless of inversion.
-- B.NTE **LOW** uses the pitch class of the lowest voiced chord tone, in the bass register.
-- VEL **PAD** follows your attack; B.VEL is inactive. This is the new-project default.
-- VEL **FIXED** uses B.VEL for each bass attack.
-- B.OCT is independent of chord and melody octave settings.
-- A per-pad bass choice or live bass gesture can override the ordinary bass choice.
-
-### PLAY and MIDI
-
-PLAY shows the chord grid and shares all eight CHORD controls: KEY, SCALE,
-EXT, OCT, SPRD, LEAD, STRUM and SUST. Touch or turn a knob to see its parameter
-and value in the footer; after release and a short delay the map status returns.
-Long chord names use two lines at the same font size, preferably separating
-root/extension or slash bass. Short names stay on one line. Very long names
-still end in `~` when truncated. MIDI has three route/channel pairs on knobs 1–6:
-**C.OUT / C.CH**, **M.OUT / M.CH**, **B.OUT / B.CH**.
+**STRUM menu.** Shift + step 7 opens GAP, DIR (UP, DOWN, ALT, RAND), TIME and
+VEL variation; knob 5 turns strum on or off and remembers the gap.
 
 ## Explore with modifiers
 
-Hold a modifier, then press a chord pad. For approach chords, the chord pad is
-the **target**. Releasing a modifier restores the next choices but does not
-replace the already sounding chord.
+Hold a modifier, then press a chord pad. For approach chords the chord pad is
+the **target**. Releasing a modifier does not change what already sounds.
 
 | Modifier | Musical effect | Example: target C major |
 | --- | --- | --- |
-| DOM (V) | Dominant seventh leading to the target. | G7 → C |
-| II | Minor seventh approach; half-diminished for a minor target. | Dm7; combine with DOM for Dm7 → G7 → C |
-| SUB | Tritone substitute dominant, a semitone above the target root. | Db7 → C |
-| MAJ/MIN | Flip a major/minor third while keeping other colour tones. Diminished/sus shapes keep their identity. | C → Cm |
-| SUS2 | Replace the third with a second. | C → Csus2 |
-| SUS4 | Replace the third with a fourth. | C → Csus4 |
-| BORROW | Borrow from the parallel scale: natural minor from a major-third scale, major from a minor-third scale. | C → Cm in C major |
+| V (DOM) | Dominant seventh leading to the target. | G7 → C |
+| II | Minor seventh approach; half-diminished for a minor target. | Dm7; combine with V for Dm7 → G7 → C |
+| SUB | Tritone substitute, a semitone above the target root. | Db7 → C |
+| MAJ/MIN | Flip the third, keeping colour tones. | C → Cm |
+| SUS2 / SUS4 | Replace the third. | Csus2 / Csus4 |
+| BORROW | Borrow from the parallel scale. | C → Cm in C major |
 
-For **ii–V–I to C**: hold II and play C; release both; hold DOM and play C;
-release both; play C alone. If GEST is ON, release all chord pads between chords.
+These are the defaults. Other functions you can assign include ADD7, b7, MAJ7,
+ADD9, ADD6, 6/9, b9, #9, #11, b13, VIIo/, CT DIM, bVII7/, iv7/, ROOT and SHELL.
 
-**Shift + BORROW** locks borrowed harmony. Repeat to unlock. A boxed **B** marks
-the lock. With MELODY SCALE and ADAPT ON, the whole melody surface follows the
-prepared borrowed scale, not just the changed chord tones.
-
-## Play a moving bass line
-
-Set **BASS ON**, **GEST ON** and a working bass destination. Initially use chord
-and bass SUST OFF, with unedited C-major pads.
-
-![Bass Gesture illustrated in five stages](images/bass-gesture.svg)
-
-1. Press and hold **C**: this anchors the C chord.
-2. While holding C, press **Em**: its root E becomes the bass. You hear **C/E**
-   without retriggering the C chord.
-3. Release C while still holding Em: no new chord or bass is selected.
-4. Press C again: only the bass returns to C; the original chord remains.
-5. Release all chord pads: the gesture ends. Notes release with SUST OFF;
-   HOLD/PEDAL instead follow their sustain behaviour.
-
-**The last new press chooses the bass. Release all pads before the next chord.**
-To play Em as a chord, release all chord pads first, then press Em again.
-If a chord change becomes a bass change, your pad presses probably overlapped.
-
-Try C → C/E → C/G → C using the corresponding root pads inside one gesture.
-Sustain can ring after the gesture ends, but a new press after all pads have
-been released begins a new chord.
-
-## Melody modes and colours
-
-- **CHORD:** chord tones across registers. TRACK makes held notes follow a
-  nearby chord tone (**NEAR**) or their pad position (**PAD**) on chord changes.
-- **SCALE:** the selected scale. ADAPT ON adjusts it to altered harmony while
-  retaining a relationship with your key. BORROW can prepare the parallel scale.
-- **CHROM:** consecutive semitones, including notes outside the scale.
-
-| Colour | Meaning |
-| --- | --- |
-| Purple | Active chord root. |
-| Blue | Other chord tones. |
-| White | Other scale tones. |
-| Grey | Notes outside the scale, in chromatic mode. |
-
-Colours describe harmony, not sustained-note activity. M.OCT moves the melody
-register without moving chords or bass.
+**Lock BORROW:** hold the BORROW pad and press the main encoder; repeat to
+unlock. A boxed **B** in the header marks the lock.
 
 ## Edit one chord
 
-**Shift + chord pad** opens EDIT. Repeat with the same pad to exit.
+**Shift + chord pad** opens EDIT for that pad; Shift + the same pad or Back closes it.
 
 | Knob | Label | Use |
 | --- | --- | --- |
-| 1 | ROOT | This chord's root, relative to the global key. |
+| 1 | ROOT | This chord's root, relative to the key. |
 | 2 | TYPE | Chord quality, or AUTO. |
 | 3 | EXT | This pad's extension, or AUTO. |
-| 4 | INV | Negative inversions move upper notes below the chord. Turn through -1, AUTO, ROOT, +1. Manual inversions override LEAD; Shift+turn restores AUTO. |
-| 5 | SPRD | This pad's voicing spread. |
-| 6 | KEEP | Keep the played modifier variation on its played bank pad; clears prepared modifiers and BORROW lock. |
-| 7 | RESET | Remove this pad's customisation and follow global settings. |
-| 8 | B.NTE | AUTO/global, ROOT, LOW or an explicit bass note. Shift + knob changes an explicit note's octave. |
+| 4 | INV | Inversion: negative values move upper notes below. Shift + turn returns to AUTO. |
+| 5 | SPRD | This pad's spread. |
+| 6 | KEEP | Turn to keep the variation you just played with a modifier. |
+| 7 | RESET | Turn to make this pad follow the global settings again. |
+| 8 | B.NTE | AUTO, ROOT, LOW or an explicit bass note (Shift + turn: octave). |
 
-Root choices transpose with KEY. An explicit bass note can give C/E without
-requiring a live gesture. KEEP and RESET act when you turn their knobs.
+## Melody
+
+Track 3, MELODY:
+
+| Knob | Label | What it changes |
+| --- | --- | --- |
+| 1 | MODE | CHORD, SCALE, CHROM, PENTA or BLUES. |
+| 2 | OCT | Melody register. |
+| 3 | ADAPT / TYPE | SCALE: adaptation OFF, CHORD or TARGET. PENTA/BLUES: AUTO, MAJOR or MINOR. |
+| 4 | R.PAD | Right-hand pads play MEL (melody) or BASS. |
+| 6 | AT | Polyphonic aftertouch OFF or POLY (synth must support poly pressure; not MPE). |
+| 8 | SUST | OFF, HOLD or PEDAL. |
+
+- **CHORD:** chord tones across registers. A held note keeps sounding when the
+  chord changes; press the pad again for the new chord's tone.
+- **SCALE:** the scale; ADAPT CHORD follows altered chords, TARGET also follows
+  where an approach chord is heading.
+- **CHROM:** semitones. **PENTA / BLUES:** solo palettes that follow the chord.
+
+| Pad colour | Meaning |
+| --- | --- |
+| Purple | Root of the sounding chord. |
+| Blue | Other chord tones. |
+| White | Other scale tones. |
+| Grey | Outside the scale. |
+
+## Bass
+
+Track 2, BASS:
+
+| Knob | Label | What it changes |
+| --- | --- | --- |
+| 1 | BASS | Automatic bass ON/OFF (ON in new projects). |
+| 2 | OCT | Bass register. |
+| 3 | R.PAD | Right-hand pads MEL or BASS (needs BASS on). |
+| 4 | B.NTE | ROOT follows the chord root; LOW uses the lowest chord tone. |
+| 5 | GEST | Bass gesture ON/OFF (ON in new projects). |
+| 8 | SUST | OFF, HOLD or PEDAL. |
+
+**B.EXTRA:** VEL PAD (follows your touch) or FIXED with B.VEL; SEQ FOLW
+(sequenced bass follows the chord clip) or CLIP (its own bass clip).
+
+### Bass gesture
+
+![Bass Gesture illustrated in five stages](images/bass-gesture.svg)
+
+1. Hold **C**: this anchors the chord.
+2. While holding C, press **Em**: only the bass moves to E (C/E).
+3. Release C while holding Em: nothing new is played.
+4. Press C again: the bass returns to C.
+5. Release all chord pads: the gesture ends.
+
+**Release all pads before the next chord.** To change chords while holding,
+turn GEST off.
+
+### Bass on the pads
+
+- **R.PAD BASS:** all sixteen right-hand pads play bass, last press wins, while
+  the left pads still play chords.
+- **On Track 2,** the chord pads play only their bass note, ready for recording
+  a bass line.
+
+## Record a loop
+
+1. Choose what to record: **PLAY** records all parts, **Track 2** bass,
+   **Track 3** melody, **Track 1** what SETUP C.REC says (ALL by default, or
+   C+B, or CHORD).
+2. Press the **Sample** button (next to Capture) to arm. It lights red.
+3. Press **Play** and perform. With COUNT on you get one bar first.
+   If Move is already playing, recording starts at once and overdubs.
+4. Press Sample again to stop recording; the loop keeps playing.
+5. **Undo** removes the last take. Mute + Track mutes a part.
+
+Move's own Record button is not used: OKTONIK shows `REC: use Sample button`.
+Each part records into its own clip, so you can edit, mute or replace it later.
+
+## Clips
+
+![Clip view: one pad row per part, eight clips each](images/clip-view.svg)
+
+**Menu** opens the clip view. The top pad row holds chord clips, the second bass
+clips, the third melody clips; the bottom-right pad is STOP.
+
+- Press a clip to play it. While playing, the change waits for the next bar.
+- **Shift + clip:** select it for editing without playing it.
+- **Copy + clip, then another clip:** copy. **Delete + clip:** clear. Undo reverts.
+- **Track 1/2/3** chooses which part's steps you see.
+
+| Knob | Label | What it changes |
+| --- | --- | --- |
+| 1 | LEN | 16, 32 or 64 steps (stop playback first). |
+| 2 | RATE | Length of one step. |
+| 3 | QNT | This clip's quantize, OFF to 100 %. |
+| 4 | PAGE | Which 16 steps the step buttons show. |
+| 5 | COUNT | Count-in. |
+| 6 | METRO | Metronome. |
+
+Shortening a clip keeps the notes beyond the end; lengthening shows them again.
+
+## Steps
+
+The step buttons show the part of the current Track page (PLAY shows chords).
+Left/Right pick the 16-step page. As on Move:
+
+- **Tap an empty step:** stores the last chord or note you played.
+- **Hold a step:** hear it; the knobs edit it (length, velocity, NUDGE; chords
+  also root, extension, inversion, strum).
+- **Hold a step + press a later step:** the note lasts until there. Steps a
+  note sounds through light faintly.
+- **Hold a step + Left/Right:** nudge it 10 % of a step (with Shift: 1 %).
+- **Hold Copy, press a step, then another:** copy it, with its timing.
+- **Hold a chord pad (or a melody pad on Track 3) + press steps:** write it to
+  each step, replacing what was there.
+- **Delete + step:** clear it.
+- **Hold Loop + step 1, 2 or 4:** clip length 16, 32 or 64.
+
+Stored chords keep their exact voicing when you later change key, LEAD or spread.
+
+## Shift + step shortcuts
+
+![Shift + step shortcut map](images/shift-steps.svg)
+
+Hold **Shift**: the icons under the step buttons light for each shortcut, and a
+step is lit when its setting is on (the metronome step is blue for ON, red for
+REC). Where Move has the same function, OKTONIK uses the same step.
+
+| Step | Shortcut |
+| --- | --- |
+| 2 | MIDI page. |
+| 3 | SETUP: quantize amount, COUNT, METRO, metronome volume, Track 1 recording (C.REC). |
+| 5 | Tempo: OKTONIK follows Move's tempo. |
+| 6 | Metronome OFF → ON → REC. |
+| 7 | STRUM menu. |
+| 8 | Right-hand pads MEL / BASS. |
+| 9 | SCALE page: key, scale, melody mode, adaptation, octaves. |
+| 10 | Full velocity: every pad plays at 127. |
+| 13 | Schwung's tool menu (not used by OKTONIK). |
+| 14 | Select the next empty clip of this part. |
+| 15 | Double the loop and its notes (16 → 32 → 64); Undo reverts. |
+| 16 | Quantize the clip; on PLAY all three parts. |
+
+SETUP, STRUM and SCALE close with the same step or Back.
+
+## Count-in, metronome and quantize
+
+- **COUNT** (SETUP or clip view): one bar before recording from stop. A chord on
+  the downbeat, or up to a sixteenth early, lands on beat one.
+- **METRO:** ON clicks while Move plays, REC only while recording; the first
+  beat of each bar is accented. **M.VOL** in SETUP sets its volume, including the count-in.
+- **Quantize** belongs to each clip and is OFF in new clips. It changes only how
+  a clip plays back; your recorded timing is kept, so switching it off restores
+  it. Set the amount in SETUP, then **Shift + 16**: on PLAY it quantizes all
+  three parts' clips, on a Track or in CLIPS only that part's clip. Press again
+  to switch off. QNT in the clip view fine-tunes one clip, so clips can differ.
 
 ## Sustain and stopping notes
 
@@ -232,56 +349,47 @@ Each part has its own SUST. Start with OFF when learning.
 
 | Mode | After pad release |
 | --- | --- |
-| OFF | Normal note-off; the instrument's release envelope still applies. |
-| HOLD | Notes stay held until the next chord or STOP. Synths can ring indefinitely. |
-| PEDAL | Note-off is sent, but MIDI CC64 sustains the sound; the next chord resets the pedal period. Requires a receiver that responds to CC64. |
+| OFF | Normal note-off; the instrument's release still applies. |
+| HOLD | Notes stay until the next chord or STOP. |
+| PEDAL | Note-off is sent and CC64 sustains; the next chord resets it. Needs a receiver that responds to CC64. |
 
-**STOP** releases OKTONIK's notes and sustain. Instrument release/reverb tails
-may continue; note-off is not an instant audio mute.
-
-CC64 affects an **entire destination/channel**. Use separate channels, configured
-on the receiving instruments, for parts with different pedal behaviour.
-`CC64: shared channel` warns about overlapping pedal destinations.
+**STOP** releases OKTONIK's notes and sustain; reverb and release tails can
+continue. CC64 affects a whole channel: give parts with different pedal
+behaviour their own channels. `CC64: shared channel` warns about overlaps.
 
 ## Route your instruments
 
 ![Three independent MIDI parts with separate route and channel controls](images/midi-routing.svg)
 
-Displayed channels are **1–16**. The receiver must listen on the selected channel.
+MIDI page: **C.OUT / C.CH**, **M.OUT / M.CH**, **B.OUT / B.CH** for chords,
+melody and bass. Channels are shown as 1–16.
 
 | OUT | Destination |
 | --- | --- |
-| MOVE | Move / USB-C route. |
-| USB-A | External USB-A MIDI route. |
-| BOTH | Move and external routes; avoid unintended doubled notes. |
-| SCHW | Schwung chain. |
+| MOVE | Move's own tracks. |
+| USB | External MIDI over USB. |
+| BOTH | Move and USB; avoid unintended doubled notes. |
+| SCHW | A Schwung chain. |
 
-These are module route labels, not a guarantee that a connected instrument is
-listening. First test one known-working destination, then split parts between
-instruments using your Schwung/Move or external receiver configuration.
+First test one known-working destination, then split the parts.
 
 ## Troubleshooting and saves
 
-- **No sound:** check the receiving instrument, volume, route/channel and
-  BASS ON if needed. Restart Move after installation. OKTONIK produces no audio itself.
-- **Only bass changes:** release all chord pads before selecting a new chord with GEST ON.
-- **Notes ring:** check SUST, press STOP and check the receiver's own hold/pedal behaviour.
-- **A knob shows `--`:** it is inactive in this mode; read the footer hint.
-- **Different chord map:** check KEY, SCALE, EXT, BORROW lock and per-pad edits.
+- **No sound:** check the instrument, volume, route and channel, and BASS ON
+  for bass. OKTONIK produces MIDI, not audio. Restart Move after installing.
+- **Only the bass changes:** bass gesture is on; release all chord pads before
+  the next chord, or turn GEST off.
+- **Notes ring on:** check SUST, press STOP, check the receiver's hold/pedal.
+- **A recording sounds stiff or loose:** check the clip's QNT (Shift + 16).
+- **A knob shows `--`:** inactive in this mode; read the footer.
 
-Settings save per Move project. Valid schema-7 Chord Pilot project data is copied
-only when OKTONIK has no own save for that project. Original files remain
-untouched; later changes are not synchronised. Keep backups and verify important
-projects after installation.
+Settings and clips are saved per Move set. Projects from older versions keep
+their settings and clip quantize. Keep backups and check important projects
+after installing.
 
-This preview has no sequencer, recording, Capture or arpeggiator. Please report
-the version, routing, sustain settings and exact actions for any bug.
-
-## In development
-
-Richer harmonic suggestions, expressive strum/patterns and capturing musical
-ideas are being explored. They are not part of this preview and have no promised
-release date. Feedback should currently focus on live harmony, melody and bass.
+When reporting a bug, include the version, the Move set, routing, sustain
+settings and the exact actions. If Move freezes or restarts, say whether only
+OKTONIK stopped or the whole Move rebooted, and whether it was on the charger.
 
 ---
 

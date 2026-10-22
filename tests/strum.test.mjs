@@ -28,7 +28,7 @@ test('saved strum parameters survive global edits and project reload',()=>{
   h.p.pad(C[0],true);h.p.step(0,true,{shift:true});
   const saved=structuredClone(h.p.inspect().progression[0].snapshot);
   h.p.knob(1,1);h.p.knob(2,-40);h.p.knob(3,-50);
-  h.p.step(0,true);
+  h.p.pad(C[0],false);h.p.step(0,false);h.p.step(0,true);
   const on=h.commands.findLast(c=>c.op==='on'&&c.strum_ms===30);
   assert.deepEqual([on.strum_dir,on.strum_time,on.strum_vel],[2,40,50]);
   h.p.unload();const restored=setup(h.files);

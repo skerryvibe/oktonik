@@ -1,5 +1,5 @@
 /* OKTONIK 0.1.0-rc.2 — independent MIDI performance engine.
- * Fixed storage and bounded work in every host callback. No audio synthesis.
+ * Fixed storage and bounded work in every host callback. Audio only for count-in.
  */
 #include "host/plugin_api_v1.h"
 #include <stdint.h>
@@ -8,7 +8,7 @@
 #include "strum.h"
 #include "divisi.h"
 
-enum { INSTANCES = 4, STEPS = 16, EVENTS = 128, CELL_TICKS=10000, LOOP_TICKS=160000, LIVE_OWNERS = 41, OWNERS = 45, LOOP_OWNER = 41, TEST_OWNER = 42, LOOP_BASS_OWNER = 43, ARP_OWNER = 44,
+enum { INSTANCES = 4, STEPS = 16, EVENTS = 128, CELL_TICKS=10000, LOOP_TICKS=160000, LIVE_OWNERS = 41, OWNERS = 173, MELODY_OWNER=45, LOOP_OWNER = 41, TEST_OWNER = 42, LOOP_BASS_OWNER = 43, ARP_OWNER = 44,
        NOTES = 8, CELLS = 1024, DESTS = 3, COMMAND_LIMIT = 1024 };
 enum { MOVE = 0, USB = 1, CHAIN = 2 };
 typedef struct {
@@ -21,8 +21,9 @@ typedef struct {
     uint64_t due[NOTES], expires;
     uint8_t velocities[NOTES];
     uint8_t pressure, channels[NOTES];
+    uint8_t expression_cc, expression;
 } Voice;
-typedef struct { uint8_t count, notes[NOTES], velocity, strum, legato, strum_dir, strum_time, strum_vel, duration; int bass, timed, at, len; } Slot;
+typedef struct { uint8_t count, notes[NOTES], velocity, strum, legato, strum_dir, strum_time, strum_vel, duration; int bass, timed, at, len; int64_t not_before; } Slot;
 typedef struct {
     int used, retired;
     const host_api_v1_t *host;
@@ -30,22 +31,38 @@ typedef struct {
     Voice voices[OWNERS];
     Slot slots[EVENTS];
     Slot bass_slots[EVENTS];
+    Slot melody_slots[EVENTS];
+    int64_t melody_start[EVENTS];
+    int melody_route,melody_channel;
+    double clip_origin[3];
+    int start_offset;
+    unsigned muted_parts;
+    int clip_length[3];
+    int clip_rate[3];
+    unsigned clip_loading;
     int bass_clip, bass_event;
     int64_t bass_start;
     uint16_t played_channels[DESTS];
     uint8_t kill_pending[DESTS][16];
     uint8_t pedal_want[DESTS][16], pedal_sent[DESTS][16], pedal_off[DESTS][16];
+    uint8_t expr_sent[DESTS][16][2], expr_valid[DESTS][16][2];
     uint64_t sample;
     uint32_t strum_seed; unsigned strum_alternate;
     int sample_rate, route, channel, rate, gate, move_available, legato, divisi;
     uint8_t divisi_map[NOTES]; int divisi_custom;
+    EnsembleMemory ensemble[2]; /* live harmony and sequencer, independent */
+    uint8_t ensemble_map[2][NOTES], ensemble_route[2], ensemble_valid[2];
     int bass_route, bass_channel, bass_velocity;
     int armed, running, slot, cycle, loop_length;
-    int event_slot, recording;
+    int event_slot, recording, overdub;
     unsigned event_serial;
     int64_t event_start;
     int64_t absolute_step;
     double last_beat;
+    int count_state, count_step, click_left, click_total, click_phase, click_accent;
+    int metro_on, metro_volume; int64_t metro_last;
+    double count_start, count_end, count_last, count_pos;
+    int count_free; unsigned count_origin; double count_bpm;
     int arp_enabled, arp_rate, arp_direction, arp_range, arp_gate, arp_swing, arp_hold, arp_velocity, arp_route, arp_channel;
     uint8_t arp_live[NOTES], arp_notes[NOTES];
     int arp_live_count, arp_count, arp_live_down, arp_from_loop;
@@ -67,12 +84,12 @@ static const double step_beats[5] = { .25, .5, 1., 2., 4. };
 enum { F_OP, F_OWNER, F_NOTES, F_VELOCITY, F_ROUTE, F_CHANNEL,
        F_STRUM, F_INDEX, F_ENABLED, F_RATE, F_GATE, F_MOVE, F_LEGATO,
        F_RETRIGGER, F_BASS, F_BASS_ROUTE, F_BASS_CHANNEL, F_BASS_VELOCITY,
-       F_DIRECTION, F_RANGE, F_SWING, F_HOLD, F_CLOCK, F_BPM, F_STRUM_DIR, F_STRUM_TIME, F_STRUM_VEL, F_DURATION, F_BASS_CLIP, F_RECORD_PART, F_AT, F_LEN, F_PRESSURE, F_DIVISI, F_CHANNELS, F_COUNT };
+       F_DIRECTION, F_RANGE, F_SWING, F_HOLD, F_CLOCK, F_BPM, F_STRUM_DIR, F_STRUM_TIME, F_STRUM_VEL, F_DURATION, F_BASS_CLIP, F_RECORD_PART, F_AT, F_LEN, F_PRESSURE, F_DIVISI, F_CHANNELS, F_CC, F_AMOUNT, F_OVERDUB, F_ORIGIN, F_COUNT };
 _Static_assert(F_COUNT<=64,"Command field mask capacity");
 typedef struct {
     uint64_t fields;
     int values[F_COUNT];
-    char op[12];
+    char op[16];
     uint8_t notes[NOTES];
     uint8_t channels[NOTES];
     int count;
@@ -132,7 +149,7 @@ static int parse_command(const char *json, Command *c) {
     static const char *keys[F_COUNT] = { "op", "owner", "notes", "velocity",
         "route", "channel", "strum_ms", "index", "enabled", "rate", "gate",
         "move_available", "legato", "retrigger", "bass", "bass_route", "bass_channel", "bass_velocity",
-        "direction", "range", "swing", "hold", "clock", "bpm", "strum_dir", "strum_time", "strum_vel", "duration", "bass_clip", "record_part", "at", "len", "pressure", "divisi", "channels" };
+        "direction", "range", "swing", "hold", "clock", "bpm", "strum_dir", "strum_time", "strum_vel", "duration", "bass_clip", "record_part", "at", "len", "pressure", "divisi", "channels", "cc", "amount", "overdub", "origin" };
     Reader r = { json, 0, 0 };
     if (!json) return 0;
     while (r.length < COMMAND_LIMIT && json[r.length]) r.length++;
@@ -173,20 +190,35 @@ static int value(const Command *c, int field, int fallback) {
 }
 static int valid_command(const Command *c) {
     static const int minima[F_COUNT] = {0,0,0,1,0,0,0,0,0,0,10,0,0,0,-1,0,0,1,0,1,0,0,0,30};
-    static const int maxima[F_COUNT] = {0,LIVE_OWNERS-1,0,127,3,15,100,EVENTS-1,1,4,100,1,1,1,127,3,15,127,4,4,50,1,1,300,3,100,100,16,1,2,LOOP_TICKS-1,LOOP_TICKS,127,1};
+    static const int maxima[F_COUNT] = {0,LIVE_OWNERS-1,0,127,3,15,100,EVENTS-1,1,4,100,1,1,1,127,3,15,127,4,4,50,1,1,300,3,100,100,64,1,2,640000-1,640000,127,2,0,11,127,1,1000000000};
+    if(has(c,F_CC) && c->values[F_CC]!=1 && c->values[F_CC]!=11)return 0;
+    if(!strcmp(c->op,"on") && has(c,F_CC)!=has(c,F_AMOUNT))return 0;
     if(has(c,F_AT)!=has(c,F_LEN) || (has(c,F_LEN)&&!c->values[F_LEN]))return 0;
-    if((!strcmp(c->op,"slot")||!strcmp(c->op,"bassslot")) && c->count && c->values[F_INDEX]>=STEPS && !has(c,F_AT))return 0;
+    if((!strcmp(c->op,"slot")||!strcmp(c->op,"bassslot")||!strcmp(c->op,"melodyslot")) && c->count && c->values[F_INDEX]>=STEPS && !has(c,F_AT))return 0;
     for (int i = F_OWNER; i < F_COUNT; i++)
         if (i != F_NOTES && i != F_CHANNELS && has(c, i) &&
             (c->values[i] < minima[i] || c->values[i] > maxima[i])) return 0;
     if (!strcmp(c->op, "on")) return has(c,F_OWNER) && has(c,F_NOTES) && c->count;
     if (!strcmp(c->op, "off")) return has(c,F_OWNER);
+    if (!strcmp(c->op,"mute")) return has(c,F_INDEX) && c->values[F_INDEX]<3 && has(c,F_ENABLED);
     if (!strcmp(c->op, "hold")) return has(c,F_OWNER);
     if (!strcmp(c->op, "pressure")) return has(c,F_OWNER) && has(c,F_PRESSURE);
+    if (!strcmp(c->op, "express")) return has(c,F_OWNER) && has(c,F_AMOUNT);
     if (!strcmp(c->op, "slot")) return has(c,F_INDEX) && has(c,F_NOTES);
     if (!strcmp(c->op, "bassslot")) return has(c,F_INDEX) && has(c,F_NOTES) && c->count<=1;
-    if (!strcmp(c->op, "arm")) return has(c,F_ENABLED);
+    if (!strcmp(c->op, "melodyslot")) return has(c,F_INDEX) && has(c,F_NOTES) && c->count<=1;
+    if (!strcmp(c->op, "melodyconfig")) return has(c,F_ROUTE) && has(c,F_CHANNEL);
+    if (!strcmp(c->op,"clipbegin")) return has(c,F_INDEX) && c->values[F_INDEX]<3;
+    if (!strcmp(c->op,"cliplength") || !strcmp(c->op,"clipend")) {
+        int length=value(c,F_DURATION,16);
+        return has(c,F_INDEX) && c->values[F_INDEX]<3 &&
+            (length==16 || length==32 || length==64) &&
+            (!strcmp(c->op,"clipend")?has(c,F_ORIGIN):has(c,F_DURATION));
+    }
+    if (!strcmp(c->op, "arm")) return has(c,F_ENABLED) && value(c,F_ORIGIN,0)<=192;
     if (!strcmp(c->op, "record")) return has(c,F_ENABLED);
+    if (!strcmp(c->op, "countin")) return has(c,F_ENABLED);
+    if (!strcmp(c->op, "metro")) return has(c,F_ENABLED);
     if (!strcmp(c->op, "arpsrc")) return has(c,F_NOTES);
     if (!strcmp(c->op, "arp")) return 1;
     if (!strcmp(c->op,"pedal")) return has(c,F_OWNER) && c->values[F_OWNER]<3 && has(c,F_ROUTE) && has(c,F_CHANNEL) && has(c,F_ENABLED) &&
@@ -298,6 +330,7 @@ static void release_voice(Pilot *s, int owner) {
     memset(v,0,sizeof(*v));
 }
 static void reconcile(Pilot *s) {
+    uint8_t expression_blocked[DESTS][16]={{0}};
     /* Offs have priority, including failed offs from a previous frame. */
     for (int i = 0; i < CELLS; i++) {
         Pitch *p = &s->pitches[i];
@@ -331,9 +364,29 @@ static void reconcile(Pilot *s) {
             if(send_packet(s,d,packet)) {s->pedal_sent[d][ch]=1;s->played_channels[d]|=(uint16_t)(1u<<ch);}
         }
     }
+    /* Channel CCs are not poly pressure. Strongest current owner wins on
+     * shared channels; no owner means leave the receiver's tail untouched.
+     * Initialise before note-on, and retry congestion without a loud attack. */
+    int wanted[DESTS][16][2];
+    for(int d=0;d<DESTS;d++)for(int ch=0;ch<16;ch++)for(int k=0;k<2;k++)wanted[d][ch][k]=-1;
+    for(int o=0;o<OWNERS;o++) {
+        Voice *v=&s->voices[o];if(!v->expression_cc)continue;
+        int k=v->expression_cc==11;
+        for(int n=0;n<v->count;n++)for(int d=0;d<DESTS;d++)
+            if(wanted_dest(v->route,d) && supports(s,d) && v->expression>wanted[d][v->channels[n]][k])
+                wanted[d][v->channels[n]][k]=v->expression;
+    }
+    for(int d=0;d<DESTS;d++)for(int ch=0;ch<16;ch++)for(int k=0;k<2;k++) {
+        int amount=wanted[d][ch][k];if(amount<0)continue;
+        if(!s->expr_valid[d][ch][k] || s->expr_sent[d][ch][k]!=amount) {
+            uint8_t msg[4]={(uint8_t)((d==CHAIN?0:0x20)|0x0b),(uint8_t)(0xb0|ch),(uint8_t)(k?11:1),(uint8_t)amount};
+            if(send_packet(s,d,msg)){s->expr_sent[d][ch][k]=(uint8_t)amount;s->expr_valid[d][ch][k]=1;}
+            else expression_blocked[d][ch]=1;
+        }
+    }
     for (int i = 0; i < CELLS; i++) {
         Pitch *p = &s->pitches[i];
-        if (p->used && p->refs && !p->sent && !p->must_off &&
+        if (p->used && p->refs && !p->sent && !p->must_off && !expression_blocked[p->dest][p->channel] &&
             !s->kill_pending[p->dest][p->channel] && !s->pedal_off[p->dest][p->channel] &&
             (!s->pedal_want[p->dest][p->channel] || s->pedal_sent[p->dest][p->channel]) && send_note(s,p,1))
             p->sent = 1;
@@ -375,12 +428,27 @@ static void service_voices(Pilot *s) {
 }
 static void start_pattern(Pilot *s, int owner, const uint8_t *notes, int count,
                         int velocity, int route, int channel, int strum, int duration_ms, int retrigger,
-                        int direction,int timing,int dynamics,int divisi,const uint8_t *channel_map) {
+                        int direction,int timing,int dynamics,int divisi,const uint8_t *channel_map,int expression_cc,int expression) {
     Voice *v;
+    /* Consume sequencer events normally while silent. Unmute never catches up
+     * or resets event cursors; only the next event may start a voice. */
+    if((owner==LOOP_OWNER && (s->muted_parts&1)) ||
+       (owner==LOOP_BASS_OWNER && (s->muted_parts&2)) ||
+       (owner>=MELODY_OWNER && (s->muted_parts&4)))return;
     uint8_t retained[NOTES] = {0};
     uint8_t channels[NOTES];
     if (!divisi_channels(notes,count,divisi&&channel_map?0:channel,divisi,channels)) { s->error="Divisi channel range"; return; }
-    if(divisi && channel_map)for(int i=0;i<count;i++)channels[i]=channel_map[channels[i]];
+    if(divisi==2) {
+        uint8_t map[NOTES], identities[NOTES];
+        if(!channel_map && channel>16-NOTES) {s->error="Divisi channel range";return;}
+        for(int i=0;i<NOTES;i++)map[i]=channel_map?channel_map[i]:(uint8_t)(channel+i);
+        int group=owner==LOOP_OWNER;
+        if(!s->ensemble_valid[group] || s->ensemble_route[group]!=route || memcmp(s->ensemble_map[group],map,NOTES))
+            memset(&s->ensemble[group],0,sizeof(s->ensemble[group]));
+        ensemble_assign(&s->ensemble[group],notes,count,identities);
+        memcpy(s->ensemble_map[group],map,NOTES);s->ensemble_route[group]=(uint8_t)route;s->ensemble_valid[group]=1;
+        for(int i=0;i<count;i++)channels[i]=map[identities[i]];
+    } else if(divisi && channel_map)for(int i=0;i<count;i++)channels[i]=channel_map[channels[i]];
     v = &s->voices[owner];
     set_pressure(s,owner,0);
     if (s->legato && owner != TEST_OWNER && v->channel == channel && v->route == route) {
@@ -398,12 +466,16 @@ static void start_pattern(Pilot *s, int owner, const uint8_t *notes, int count,
     v->count = (uint8_t)count; v->velocity = (uint8_t)velocity;
     v->route = (uint8_t)route; v->channel = (uint8_t)channel;
     v->retrigger = (uint8_t)retrigger;
+    v->expression_cc=(uint8_t)expression_cc;v->expression=(uint8_t)expression;
     unsigned delays[NOTES];
     strum_plan(notes,count,velocity,strum,direction,timing,dynamics,s->strum_alternate,&s->strum_seed,delays,v->velocities);
     if(strum && count>1 && direction==2)s->strum_alternate++;
     for (int i = 0; i < count; i++) {
         v->notes[i] = notes[i];
         v->channels[i] = channels[i];
+        /* A co-running instrument may have changed its controller externally.
+         * Reassert expression on every new attack, not just value changes. */
+        if(expression_cc)for(int d=0;d<DESTS;d++)if(wanted_dest(route,d))s->expr_valid[d][channels[i]][expression_cc==11]=0;
         v->assigned[i] = retained[i];
         v->due[i] = s->sample + (uint64_t)delays[i] * (unsigned)s->sample_rate / 1000;
     }
@@ -411,9 +483,12 @@ static void start_pattern(Pilot *s, int owner, const uint8_t *notes, int count,
     service_voices(s);
 }
 static void start_voice(Pilot *s,int owner,const uint8_t *notes,int count,int velocity,int route,int channel,int strum,int duration_ms,int retrigger) {
-    start_pattern(s,owner,notes,count,velocity,route,channel,strum,duration_ms,retrigger,0,0,0,0,0);
+    start_pattern(s,owner,notes,count,velocity,route,channel,strum,duration_ms,retrigger,0,0,0,0,0,0,0);
 }
 static void panic(Pilot *s) {
+    s->count_state=0;s->click_left=0;
+    memset(s->expr_valid,0,sizeof(s->expr_valid));
+    memset(s->ensemble,0,sizeof(s->ensemble));memset(s->ensemble_valid,0,sizeof(s->ensemble_valid));
     for(int d=0;d<DESTS;d++) for(int ch=0;ch<16;ch++) {
         s->pedal_want[d][ch]=0;
         if(s->pedal_sent[d][ch])s->pedal_off[d][ch]=1;
@@ -432,20 +507,24 @@ static void release_loop(Pilot *s) {
     if(!s->bass_clip) release_voice(s,LOOP_BASS_OWNER);
 }
 static void start_loop_bass(Pilot *s, Slot *slot) {
-    if(s->bass_clip || (s->recording&2))return;
+    if(s->bass_clip || (s->recording&2) || (s->clip_loading&3))return;
     if (slot->bass >= 0) {
         uint8_t bass = (uint8_t)slot->bass;
         start_voice(s,LOOP_BASS_OWNER,&bass,1,s->bass_velocity,s->bass_route,s->bass_channel,0,0,0);
     } else release_voice(s,LOOP_BASS_OWNER);
 }
 static void start_loop(Pilot *s, Slot *slot) {
+    if(s->clip_loading&1)return;
     int live_legato = s->legato;
     s->legato = slot->legato;
-    if(!(s->recording&1))start_pattern(s,LOOP_OWNER,slot->notes,slot->count,slot->velocity,s->route,s->channel,slot->strum,0,0,slot->strum_dir,slot->strum_time,slot->strum_vel,s->divisi,s->divisi_custom?s->divisi_map:0);
+    if(!(s->recording&1))start_pattern(s,LOOP_OWNER,slot->notes,slot->count,slot->velocity,s->route,s->channel,slot->strum,0,0,slot->strum_dir,slot->strum_time,slot->strum_vel,s->divisi,s->divisi_custom?s->divisi_map:0,0,0);
     start_loop_bass(s,slot);
     s->legato = live_legato;
 }
 static void stop_loop(Pilot *s) {
+    memset(s->clip_origin,0,sizeof(s->clip_origin));
+    for(int i=0;i<EVENTS;i++){release_voice(s,MELODY_OWNER+i);s->melody_start[i]=-1;s->melody_slots[i].not_before=0;}
+    for(int i=0;i<EVENTS;i++){s->slots[i].not_before=0;s->bass_slots[i].not_before=0;}
     if (s->running) clear_latched(s);
     release_loop(s);
     release_voice(s,LOOP_BASS_OWNER);s->bass_event=-1;s->bass_start=-1;
@@ -456,14 +535,15 @@ static int host_clock_ready(Pilot *s, double beat);
 static int loop_has_chords(Pilot *s);
 /* Bounded event scan at every audio block, not just integer step boundaries.
  * Expired recent attacks still supersede earlier ones (no implicit resume). */
-static int timeline_event(Slot *slots, int64_t tick, int64_t *start) {
+static int timeline_event(Slot *slots, int64_t tick, int64_t *start, int loop_ticks) {
     int latest=-1;int64_t when=-1;
-    const int64_t base=(tick/LOOP_TICKS)*LOOP_TICKS;
+    const int64_t base=(tick/loop_ticks)*loop_ticks;
     for(int i=0;i<EVENTS;i++) {
         Slot *slot=&slots[i];if(!slot->count)continue;
+        if((slot->timed?slot->at:i*CELL_TICKS)>=loop_ticks)continue;
         int64_t on=base+(slot->timed?slot->at:i*CELL_TICKS);
-        if(on>tick)on-=LOOP_TICKS;
-        if(on<0 || on<when)continue;
+        if(on>tick)on-=loop_ticks;
+        if(on<slot->not_before || on<0 || on<when)continue;
         latest=i;when=on;
     }
     if(latest>=0) {
@@ -478,8 +558,8 @@ static void update_loop(Pilot *s) {
     int64_t step;
     /* A position is a time cell, not a member of a compact chord list.
      * Empty cells are rests and an empty clip still has a moving playhead. */
-    const int length = STEPS;
-    if (length != s->loop_length) { stop_loop(s); s->loop_length = length; }
+    const int length = s->clip_length[0];
+    s->loop_length = length;
     if (!s->armed || !s->host || !s->host->get_beat_position) {
         stop_loop(s); return;
     }
@@ -487,17 +567,21 @@ static void update_loop(Pilot *s) {
     if (!host_clock_ready(s,beat)) { stop_loop(s); return; }
     /* Negatives, NaN and implausible values cannot enter integer conversion. */
     if (!(beat >= 0. && beat < 1.e12)) { stop_loop(s); return; }
-    span = step_beats[s->rate];
-    step = (int64_t)(beat / span);
-    const int64_t tick=(int64_t)(beat/span*CELL_TICKS+0.00001);
+    span = step_beats[s->clip_rate[0]>=0?s->clip_rate[0]:s->rate];
+    if(beat<s->last_beat || (!s->running && s->start_offset))
+        for(int part=0;part<3;part++)s->clip_origin[part]=-s->start_offset;
+    double phase=beat-s->clip_origin[0];if(phase<0)phase=0;
+    step = (int64_t)(phase / span);
+    const int64_t tick=(int64_t)(phase/span*CELL_TICKS+0.00001);
     int64_t event_start;
-    const int source=timeline_event(s->slots,tick,&event_start);
+    if(beat<s->last_beat)for(int i=0;i<EVENTS;i++){s->slots[i].not_before=0;s->bass_slots[i].not_before=0;s->melody_slots[i].not_before=0;release_voice(s,MELODY_OWNER+i);s->melody_start[i]=-1;}
+    const int source=timeline_event(s->slots,tick,&event_start,length*CELL_TICKS);
     const int event_changed=source!=s->event_slot || (source>=0 && event_start!=s->event_start);
     if (event_changed || step != s->absolute_step || beat < s->last_beat || !s->running) {
         Slot *slot=source>=0?&s->slots[source]:0;
         const int attack=event_changed || beat<s->last_beat || !s->running;
         if(attack && slot)s->event_serial=(s->event_serial+1)&65535u;
-        if(attack && !s->recording && loop_has_chords(s))clear_latched(s);
+        if(attack && !s->recording && !s->overdub && loop_has_chords(s))clear_latched(s);
         if (attack && (!slot || !slot->legato || (!slot->duration && s->gate < 100) || step != s->absolute_step + 1 || beat < s->last_beat))
             release_loop(s);
         s->absolute_step = step; s->slot = (int)(step % length);
@@ -533,20 +617,42 @@ static int loop_has_chords(Pilot *s) {
 /* Separate onset/duration lane: chord rests and chord gate never end bass events. */
 static void update_bass_loop(Pilot *s) {
     if(!s->bass_clip)return;
-    if(!s->running || (s->recording&2)) {
+    if(!s->running || (s->recording&2) || (s->clip_loading&2)) {
         release_voice(s,LOOP_BASS_OWNER);s->bass_event=-1;s->bass_start=-1;return;
     }
-    const int64_t tick=(int64_t)(s->last_beat/step_beats[s->rate]*CELL_TICKS+0.00001);
+    double phase=s->last_beat-s->clip_origin[1];if(phase<0)phase=0;
+    const int64_t tick=(int64_t)(phase/step_beats[s->clip_rate[1]>=0?s->clip_rate[1]:s->rate]*CELL_TICKS+0.00001);
     int64_t start;
-    int source=timeline_event(s->bass_slots,tick,&start);
+    int source=timeline_event(s->bass_slots,tick,&start,s->clip_length[1]*CELL_TICKS);
     if(source!=s->bass_event || start!=s->bass_start) {
         release_voice(s,LOOP_BASS_OWNER);
         if(source>=0) {
             Slot *slot=&s->bass_slots[source];
-            start_voice(s,LOOP_BASS_OWNER,slot->notes,1,slot->velocity,s->bass_route,s->bass_channel,0,0,0);
+            /* Each sequenced event is a new attack, even on a pitch still held. */
+            start_voice(s,LOOP_BASS_OWNER,slot->notes,1,slot->velocity,s->bass_route,s->bass_channel,0,0,1);
         }
     }
     s->bass_event=source;s->bass_start=start;
+}
+/* Independent absolute-pitch notes; each bounded event owns its release. */
+static void update_melody_loop(Pilot *s) {
+    const int loop_ticks=s->clip_length[2]*CELL_TICKS;
+    double phase=s->last_beat-s->clip_origin[2];if(phase<0)phase=0;
+    const int64_t tick=s->running?(int64_t)(phase/step_beats[s->clip_rate[2]>=0?s->clip_rate[2]:s->rate]*CELL_TICKS+0.00001):0;
+    for(int i=0;i<EVENTS;i++) {
+        Slot *slot=&s->melody_slots[i];
+        int offset=slot->timed?slot->at:i*CELL_TICKS;
+        int64_t on=(tick/loop_ticks)*loop_ticks+offset;
+        if(on>tick)on-=loop_ticks;
+        int length=slot->timed?slot->len:(slot->duration?slot->duration:1)*CELL_TICKS;
+        int active=offset<loop_ticks && s->running && !(s->clip_loading&4) && slot->count && on>=0 && on>=slot->not_before && tick<on+length;
+        if(!active){release_voice(s,MELODY_OWNER+i);s->melody_start[i]=-1;continue;}
+        if(s->melody_start[i]!=on) {
+            release_voice(s,MELODY_OWNER+i);
+            start_voice(s,MELODY_OWNER+i,slot->notes,1,slot->velocity,s->melody_route,s->melody_channel,0,0,1);
+            s->melody_start[i]=on;
+        }
+    }
 }
 static void update_arp(Pilot *s) {
     uint8_t notes[NOTES * 4];
@@ -630,13 +736,39 @@ static int pending_count(Pilot *s) {
     return count;
 }
 
+/* A completed take is published on release. Do not replay its past onset
+ * immediately; its next traversal is the first audible playback. */
+static void defer_recorded_slot(Pilot *s, Slot *slot,int part) {
+    slot->not_before=0;
+    if(!s->overdub || !s->running || !s->host || !s->host->get_beat_position)return;
+    double beat=s->host->get_beat_position()-s->clip_origin[part];
+    if(beat>=0. && beat<1.e12)slot->not_before=(int64_t)(beat/step_beats[s->clip_rate[part]>=0?s->clip_rate[part]:s->rate]*CELL_TICKS)+1;
+}
 static void set_param(void *instance, const char *key, const char *json) {
     Pilot *s = instance;
     Command c;
     if (!s || !s->used || s->retired || !key || strcmp(key,"command")) return;
     if (!parse_command(json,&c) || !valid_command(&c)) { s->error = "Invalid command"; return; }
     s->error = 0;
-    if (!strcmp(c.op,"pedal")) {
+    if (!strcmp(c.op,"mute")) {
+        int part=c.values[F_INDEX];unsigned bit=1u<<part;
+        if(c.values[F_ENABLED]) {
+            s->muted_parts|=bit;
+            if(part==0)release_voice(s,LOOP_OWNER);
+            if(part==1)release_voice(s,LOOP_BASS_OWNER);
+            if(part==2)for(int i=0;i<EVENTS;i++)release_voice(s,MELODY_OWNER+i);
+        } else s->muted_parts&=~bit;
+        reconcile(s);
+    } else if (!strcmp(c.op,"countin")) {
+        s->count_state=c.values[F_ENABLED]?1:0;
+        s->count_free=value(&c,F_CLOCK,0);s->count_origin=s->sample;
+        s->count_bpm=s->host&&s->host->get_bpm?s->host->get_bpm():0.;
+        if(s->count_free && !(s->count_bpm>=30.&&s->count_bpm<=300.))s->count_state=4;
+        s->count_step=-1;s->count_start=s->count_end=s->count_last=-1.;s->click_left=0;
+    } else if (!strcmp(c.op,"metro")) {
+        s->metro_on=c.values[F_ENABLED]!=0;s->metro_last=-1;
+        if(has(&c,F_VELOCITY))s->metro_volume=c.values[F_VELOCITY];
+    } else if (!strcmp(c.op,"pedal")) {
         const int bit=1<<c.values[F_OWNER];
         for(int d=0;d<DESTS;d++) for(int ch=0;ch<16;ch++) {
             int want=s->pedal_want[d][ch]&~bit;
@@ -696,8 +828,11 @@ static void set_param(void *instance, const char *key, const char *json) {
         s->legato = value(&c,F_LEGATO,s->legato);
         start_pattern(s,c.values[F_OWNER],c.notes,c.count,value(&c,F_VELOCITY,100),
                     value(&c,F_ROUTE,s->route),value(&c,F_CHANNEL,s->channel),value(&c,F_STRUM,0),0,value(&c,F_RETRIGGER,0),
-                    value(&c,F_STRUM_DIR,0),value(&c,F_STRUM_TIME,0),value(&c,F_STRUM_VEL,0),value(&c,F_DIVISI,0),has(&c,F_CHANNELS)?c.channels:0);
+                    value(&c,F_STRUM_DIR,0),value(&c,F_STRUM_TIME,0),value(&c,F_STRUM_VEL,0),value(&c,F_DIVISI,0),has(&c,F_CHANNELS)?c.channels:0,value(&c,F_CC,0),value(&c,F_AMOUNT,0));
         s->legato = live_legato;
+    } else if (!strcmp(c.op,"express")) {
+        Voice *v=&s->voices[c.values[F_OWNER]];
+        if(v->count && v->expression_cc)v->expression=(uint8_t)c.values[F_AMOUNT];
     } else if (!strcmp(c.op,"pressure")) {
         if (s->voices[c.values[F_OWNER]].count)
             set_pressure(s,c.values[F_OWNER],c.values[F_PRESSURE]);
@@ -718,27 +853,59 @@ static void set_param(void *instance, const char *key, const char *json) {
         slot->duration=(uint8_t)value(&c,F_DURATION,0);
         slot->timed=has(&c,F_AT);slot->at=value(&c,F_AT,0);slot->len=value(&c,F_LEN,0);
         memcpy(slot->notes,c.notes,(unsigned)c.count);
+        defer_recorded_slot(s,slot,0);
         if (!c.count && s->event_slot == c.values[F_INDEX]) release_loop(s);
-        else if (changed && s->event_slot == c.values[F_INDEX] && s->voices[LOOP_OWNER].count)
+        else if (!s->overdub && changed && s->event_slot == c.values[F_INDEX] && s->voices[LOOP_OWNER].count)
             start_loop(s,slot);
-        else if (bass_changed && s->event_slot == c.values[F_INDEX] && s->voices[LOOP_OWNER].count)
+        else if (!s->overdub && bass_changed && s->event_slot == c.values[F_INDEX] && s->voices[LOOP_OWNER].count)
             start_loop_bass(s,slot);
+    } else if (!strcmp(c.op,"clipbegin")) {
+        int part=c.values[F_INDEX];s->clip_loading|=1u<<part;
+        if(part==0){release_loop(s);s->event_slot=-1;s->event_start=-1;}
+        if(part==1){release_voice(s,LOOP_BASS_OWNER);s->bass_event=-1;s->bass_start=-1;}
+        if(part==2)for(int i=0;i<EVENTS;i++){release_voice(s,MELODY_OWNER+i);s->melody_start[i]=-1;}
+    } else if (!strcmp(c.op,"cliplength")) {
+        s->clip_length[c.values[F_INDEX]]=c.values[F_DURATION];
+        if(has(&c,F_RATE))s->clip_rate[c.values[F_INDEX]]=c.values[F_RATE];
+    } else if (!strcmp(c.op,"clipend")) {
+        int part=c.values[F_INDEX];s->clip_origin[part]=c.values[F_ORIGIN];s->clip_loading&=~(1u<<part);
+        s->clip_length[part]=value(&c,F_DURATION,s->clip_length[part]);
+        Slot *lane=part==0?s->slots:part==1?s->bass_slots:s->melody_slots;
+        for(int i=0;i<EVENTS;i++)lane[i].not_before=0;
+        if(part==0){s->event_slot=-1;s->event_start=-1;s->absolute_step=-1;}
+        if(part==1){s->bass_event=-1;s->bass_start=-1;}
+        if(part==2)for(int i=0;i<EVENTS;i++)s->melody_start[i]=-1;
+    } else if (!strcmp(c.op,"melodyconfig")) {
+        if(s->melody_route!=c.values[F_ROUTE] || s->melody_channel!=c.values[F_CHANNEL])
+            for(int i=0;i<EVENTS;i++){release_voice(s,MELODY_OWNER+i);s->melody_start[i]=-1;}
+        s->melody_route=c.values[F_ROUTE];s->melody_channel=c.values[F_CHANNEL];
+    } else if (!strcmp(c.op,"melodyslot")) {
+        int i=c.values[F_INDEX];Slot *slot=&s->melody_slots[i];
+        release_voice(s,MELODY_OWNER+i);s->melody_start[i]=-1;
+        slot->count=(uint8_t)c.count;slot->notes[0]=c.notes[0];
+        slot->velocity=(uint8_t)value(&c,F_VELOCITY,100);slot->duration=(uint8_t)value(&c,F_DURATION,1);
+        slot->timed=has(&c,F_AT);slot->at=value(&c,F_AT,0);slot->len=value(&c,F_LEN,0);
+        defer_recorded_slot(s,slot,2);
     } else if (!strcmp(c.op,"bassslot")) {
         Slot *slot=&s->bass_slots[c.values[F_INDEX]];
         int changed=slot->count!=c.count || (c.count && slot->notes[0]!=c.notes[0]) || slot->duration!=value(&c,F_DURATION,1) || slot->velocity!=value(&c,F_VELOCITY,100) || slot->at!=value(&c,F_AT,0) || slot->len!=value(&c,F_LEN,0);
         slot->count=(uint8_t)c.count;slot->notes[0]=c.notes[0];
         slot->duration=(uint8_t)value(&c,F_DURATION,1);slot->velocity=(uint8_t)value(&c,F_VELOCITY,100);
         slot->timed=has(&c,F_AT);slot->at=value(&c,F_AT,0);slot->len=value(&c,F_LEN,0);
+        defer_recorded_slot(s,slot,1);
         if(changed && s->bass_event==c.values[F_INDEX]) {
             release_voice(s,LOOP_BASS_OWNER);s->bass_event=-1;s->bass_start=-1;
         }
     } else if (!strcmp(c.op,"cleargrid")) {
-        stop_loop(s);memset(s->slots,0,sizeof(s->slots));memset(s->bass_slots,0,sizeof(s->bass_slots));
+        s->clip_loading=0;
+        stop_loop(s);memset(s->slots,0,sizeof(s->slots));memset(s->bass_slots,0,sizeof(s->bass_slots));memset(s->melody_slots,0,sizeof(s->melody_slots));
     } else if (!strcmp(c.op,"record")) {
+        if(!c.values[F_ENABLED]){s->count_state=0;s->click_left=0;}
         /* Bit 1 mutes captured chords, bit 2 captured bass. Unarmed lanes
          * retain ownership and phase, including when Record ends mid-note. */
         int part=value(&c,F_RECORD_PART,0);
-        int next=c.values[F_ENABLED]?(part==1?1:part==2?2:3):0;
+        s->overdub=c.values[F_ENABLED] && value(&c,F_OVERDUB,0);
+        int next=c.values[F_ENABLED] && !s->overdub?(part==1?1:part==2?2:3):0;
         if(next&1)release_voice(s,LOOP_OWNER);
         if((next|s->recording)&2) {
             release_voice(s,LOOP_BASS_OWNER);s->bass_event=-1;s->bass_start=-1;
@@ -746,14 +913,16 @@ static void set_param(void *instance, const char *key, const char *json) {
         s->recording=next;
     } else if (!strcmp(c.op,"arm")) {
         s->armed = c.values[F_ENABLED];
-        if (!s->armed) stop_loop(s);
+        s->start_offset=s->armed?value(&c,F_ORIGIN,0):0;
+        if (!s->armed) {stop_loop(s);s->count_state=0;s->click_left=0;}
     } else if (!strcmp(c.op,"panic")) {
         /* Preserve arming and phase: do not retrigger this step after panic. */
         panic(s);
     } else if (!strcmp(c.op,"kill")) {
+        s->clip_loading=0;
         /* Explicit STOP: no new loop/strum/test attacks after this command. */
         s->armed = 0;
-        s->recording=0;
+        s->recording=0;s->overdub=0;
         stop_loop(s);
         panic(s);
         for (int d = 0; d < DESTS; d++) for (int ch = 0; ch < 16; ch++)
@@ -786,7 +955,8 @@ static int get_param(void *instance, const char *key, char *buf, int size) {
     if (!strcmp(key,"clock")) {
         const double beat=s->host&&s->host->get_beat_position?s->host->get_beat_position():-1.;
         const int valid=beat>=0. && beat<1.e12;
-        n=snprintf(buf,(unsigned)size,"{\"beat\":%.6f,\"ready\":%s}",valid?beat:-1.,valid&&host_clock_ready(s,beat)?"true":"false");
+        const double bpm=s->host&&s->host->get_bpm?s->host->get_bpm():0.;
+        n=snprintf(buf,(unsigned)size,"{\"beat\":%.6f,\"ready\":%s,\"bpm\":%.3f,\"count_state\":%d,\"count_step\":%d,\"count_end\":%.0f,\"count_free\":%d,\"count_pos\":%.3f}",valid?beat:-1.,valid&&host_clock_ready(s,beat)?"true":"false",bpm>=20.&&bpm<=999.?bpm:0.,s->count_state,s->count_step,s->count_end,s->count_free,s->count_state==2?s->count_pos:0.);
     } else if (!strcmp(key,"arp_diag")) {
         const int clock = s->host && s->host->get_clock_status ? s->host->get_clock_status() : -1;
         const int moving = s->diag_clock_seen && s->sample - s->diag_clock_sample < (unsigned)s->sample_rate / 2;
@@ -841,6 +1011,48 @@ static void reap_retired(void) {
         if (!pending_count(&pool[i])) { pool[i].used = 0; pool[i].retired = 0; }
     }
 }
+/* Four quarter-note clicks; transport/time are supplied by the platform adapter.
+ * State: 0 off, 1 waiting for clock/boundary, 2 counting, 3 done, 4 interrupted.
+ * A late block emits at most one click, never a catch-up burst. */
+static void start_click(Pilot *s, int accent) {
+    s->click_total=s->sample_rate/50;
+    if(s->click_total<1)s->click_total=1;
+    s->click_left=s->click_total;s->click_phase=0;s->click_accent=accent;
+}
+static void update_countin(Pilot *s, double beat, int ready) {
+    if(s->count_state!=1 && s->count_state!=2)return;
+    if(s->count_free){beat=(double)(s->sample-s->count_origin)/s->sample_rate*s->count_bpm/60.;ready=1;}
+    if(!ready || !(beat>=0. && beat<1.e9)) {
+        if(s->count_start>=0.){s->count_state=4;s->click_left=0;}
+        return;
+    }
+    if(s->count_start<0.) {
+        int64_t whole=(int64_t)beat;
+        int64_t bar=whole/4*4;
+        s->count_start=s->count_free?0.:beat-(double)bar<.01?(double)bar:(double)(bar+4);
+        s->count_end=s->count_start+4.;s->count_last=beat;
+    }
+    if(beat<s->count_last){s->count_state=4;s->click_left=0;return;}
+    s->count_last=beat;
+    if(beat<s->count_start)return;
+    if(beat>=s->count_end){s->count_state=3;s->click_left=0;return;}
+    s->count_state=2;s->count_pos=beat-s->count_start;
+    int step=(int)(beat-s->count_start);
+    if(step!=s->count_step){
+        s->count_step=step;start_click(s,step==0);
+    }
+}
+/* Metronome: one click per host beat, accented on each bar. The count-in owns
+ * the click while it runs; a stopped or rewound clock waits for the next beat. */
+static void update_metro(Pilot *s, double beat, int ready) {
+    if(!s->metro_on || !ready || !(beat>=0. && beat<1.e9)){s->metro_last=-1;return;}
+    if(s->count_state==1 || s->count_state==2)return;
+    int64_t whole=(int64_t)beat;
+    if(whole==s->metro_last)return;
+    int fresh=s->metro_last<0 ? beat-(double)whole<.25 : 1; /* first block after Play can trail beat 0 */
+    s->metro_last=whole;
+    if(fresh)start_click(s,whole%4==0);
+}
 static void render_block(void *instance, int16_t *out, int frames) {
     Pilot *s = instance;
     if (frames < 0 || frames > 4096) return;
@@ -848,6 +1060,22 @@ static void render_block(void *instance, int16_t *out, int frames) {
     if (!s || !s->used || s->retired) return;
     reap_retired();
     s->diag_blocks++;
+    {
+        double beat=s->host&&s->host->get_beat_position?s->host->get_beat_position():-1.;
+        update_countin(s,beat,host_clock_ready(s,beat));
+        update_metro(s,beat,host_clock_ready(s,beat));
+        for(int i=0;i<frames && s->click_left>0;i++) {
+            /* Short, quiet, decaying square pulse; bar downbeats are accented.
+             * No MIDI is generated and no instrument voice is borrowed. */
+            int hz=s->click_accent?1500:1000;
+            int period=s->sample_rate/hz;if(period<2)period=2;
+            int volume=s->metro_volume?s->metro_volume:100; /* percent; also scales the count-in */
+            int amp=(int)((int64_t)(s->click_accent?2800:1800)*volume/100*s->click_left/s->click_total);
+            int sample=s->click_phase<period/2?amp:-amp;
+            if(out){out[i*2]=(int16_t)sample;out[i*2+1]=(int16_t)sample;}
+            s->click_phase=(s->click_phase+1)%period;s->click_left--;
+        }
+    }
     if (s->host && s->host->get_beat_position) {
         const double beat = s->host->get_beat_position();
         if (beat >= 0. && beat < 1.e12 && s->diag_beat >= 0. && beat != s->diag_beat) {
@@ -858,6 +1086,7 @@ static void render_block(void *instance, int16_t *out, int frames) {
     }
     update_loop(s);
     update_bass_loop(s);
+    update_melody_loop(s);
     update_arp(s);
     service_voices(s);
     s->sample += (unsigned)frames;
@@ -869,6 +1098,7 @@ static void *create_instance(const char *dir, const char *defaults) {
         Pilot *s = &pool[i];
         memset(s,0,sizeof(*s));
         s->used = 1; s->host = current_host;
+        for(int part=0;part<3;part++){s->clip_length[part]=16;s->clip_rate[part]=-1;}
         s->sample_rate = current_host && current_host->sample_rate > 0 ? current_host->sample_rate : MOVE_SAMPLE_RATE;
         s->rate = 2; s->gate = 80; s->slot = -1; s->absolute_step = -1; s->last_beat = -1.;
         s->event_slot=-1;s->event_start=-1;

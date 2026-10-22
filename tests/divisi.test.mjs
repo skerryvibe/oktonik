@@ -9,11 +9,25 @@ function setup(settings={},profile='lab') {
     write:(_path,s)=>{saved=s;return true;},send:c=>commands.push(c)});p.init();
   return {p,commands,saved:()=>saved,page:n=>navigate(p,n)};
 }
+test('stable ensemble is opt-in, persists and sends mode 2 only to Lab chords',()=>{
+  assert.equal(normalizeSettings({}).ensembleSmooth,false);
+  const h=setup({divisi:true,bassEnabled:true,bassGesture:true});h.page('EXPR');h.p.knob(4,1);
+  assert.equal(h.p.inspect().model.cells[4].value,'SMTH');
+  h.p.pad(C[0],true);h.p.pad(M[0],true);
+  assert.equal(h.commands.findLast(c=>c.op==='on'&&c.owner===0).divisi,2);
+  assert.equal(h.commands.findLast(c=>c.op==='config').divisi,2);
+  assert.ok(h.commands.filter(c=>c.op==='on'&&c.owner!==0).every(c=>!c.divisi));
+  const from=h.commands.length;h.p.pad(C[2],true);
+  assert.ok(!h.commands.slice(from).some(c=>c.op==='on'&&c.divisi));
+  h.p.unload();assert.equal(JSON.parse(h.saved()).settings.ensembleSmooth,true);
+  const pub=setup({divisi:true,ensembleSmooth:true},'public');pub.p.pad(C[0],true);
+  assert.ok(pub.commands.every(c=>!c.divisi));
+});
 test('divisi defaults off, persists with schema 7 and never activates in Public',()=>{
   assert.equal(normalizeSettings({}).divisi,false);
   assert.equal(normalizeSettings({divisi:true,channel:15}).divisi,true);
   assert.deepEqual(normalizeSettings({channel:3}).ensembleChannels,[3,4,5,6,7,8,9,10]);
-  const h=setup();h.page('STRUM');h.p.knob(6,1);
+  const h=setup();h.page('EXPR');h.p.knob(6,1);
   assert.equal(h.p.inspect().model.cells[6].value,'NOTE');
   h.p.unload();assert.equal(JSON.parse(h.saved()).schemaVersion,7);
   assert.match(h.saved(),/"divisi":true/);
@@ -33,7 +47,7 @@ test('only chord owners receive divisi; bass, melody and arp keep independent ou
   assert.equal(h.commands.findLast(c=>c.op==='config').divisi,1);
 });
 test('divisi channel editing stops old owners, accepts arbitrary channels and leaves C.CH alone',()=>{
-  const h=setup();h.p.pad(C[0],true);h.page('STRUM');
+  const h=setup();h.p.pad(C[0],true);h.page('EXPR');
   let from=h.commands.length;h.p.knob(6,1);
   assert.ok(h.commands.slice(from).some(c=>c.op==='panic'));
   assert.equal(h.p.inspect().voices.length,0);

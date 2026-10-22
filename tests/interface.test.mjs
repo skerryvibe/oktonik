@@ -19,7 +19,7 @@ function setup(settings = {}) {
   return { pilot, commands, leds, page, turn };
 }
 
-test('settings have one home besides PLAY and the STRUM gap shortcut; unused knobs are inert', () => {
+test('settings have one home besides PLAY, STRUM gap and the shared right-pad selector; unused knobs are inert', () => {
   const { pilot, page, commands } = setup();
   const ids = [];
   for (const name of [...PAGES,'STRUM','M.EXTRA','B.EXTRA','A.CLOCK','ENSEMBL']) {
@@ -28,7 +28,7 @@ test('settings have one home besides PLAY and the STRUM gap shortcut; unused kno
     if (!['PLAY','THEORY'].includes(name)) assert.equal(cells.length, 8);
     cells.forEach((cell, i) => {
       assert.ok(cell.label.length <= 5, `${cell.label} must fit its knob cell`);
-      if (cell.id) { if (name !== 'PLAY' && !(name === 'STRUM' && cell.id === 'strumMs')) ids.push(cell.id); }
+      if (cell.id) { if (name !== 'PLAY' && !(name === 'STRUM' && cell.id === 'strumMs') && !(name === 'MELODY' && cell.id === 'bassPads')) ids.push(cell.id); }
       else {
         const before = pilot.inspect().settings, sent = commands.length;
         pilot.knob(i, 1); pilot.focus(i);
@@ -89,10 +89,10 @@ test('mode-specific controls explain their availability; HOLD prevents ineffecti
   page('SEQ'); const gate = pilot.inspect().settings.gate;
   const text = [];
   renderScreen({ clear() {}, line() {}, fill() {}, rect() {}, text: (_x, _y, value) => text.push(value) }, pilot.inspect().model);
-  assert.ok(text.includes('HOLD'));
-  turn('gate', -1); assert.equal(pilot.inspect().settings.gate, gate);
+  assert.ok(!text.includes('GATE'));
+  pilot.knob(2,-1); assert.equal(pilot.inspect().settings.gate, gate);
   page('CHORDS'); turn('chordSustain', -1);
-  page('SEQ'); turn('gate', -1); assert.equal(pilot.inspect().settings.gate, gate - 5);
+  page('SEQ'); pilot.knob(2,-1); assert.equal(pilot.inspect().settings.gate, gate);
 });
 
 test('STOP pad silences all parts from every page, cancels the loop and permits a clean next attack', () => {
@@ -136,9 +136,9 @@ test('MIDI last pair controls ARP without sending test notes', () => {
 test('legacy sequence route survives load and save, and can explicitly rejoin chord output',()=>{
   const {pilot,page,turn,commands}=setup({route:'external',previewRoute:'move'});
   assert.equal(pilot.inspect().settings.route,'external');
-  page('SEQ');assert.equal(pilot.inspect().model.cells[5].id,'quantize');
+  page('SEQ');assert.equal(pilot.inspect().model.cells[5].id,'clipQuantize');
   page('MIDI');turn('previewRoute',1);turn('previewRoute',-1);
   assert.equal(pilot.inspect().settings.route,'move');
-  page('SEQ');assert.equal(pilot.inspect().model.cells[5].id,'quantize');
+  page('SEQ');assert.equal(pilot.inspect().model.cells[5].id,'clipQuantize');
   assert.equal(commands.findLast(c=>c.op==='config').route,0);
 });

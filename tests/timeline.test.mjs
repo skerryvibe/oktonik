@@ -5,6 +5,17 @@ import {createChordRecorder} from '../src/recording.mjs';
 import {createPilot,PAGES,CHORD_PADS as C} from '../src/pilot.mjs';
 import {encodeDocument,decodeDocument,normalizeStep,STATE_PATH,normalizeBassStep} from '../src/settings.mjs';
 
+test('nudge offsets quantized onset without altering duration and survives bass normalization',()=>{
+ for(const q of [0,70,100]) {
+  const raw={start:2.2,duration:1.1},plain=quantizedTiming(raw,q);
+  const shifted=quantizedTiming({...raw,nudge:-.13},q);
+  assert.equal(shifted.at,plain.at-1300);assert.equal(shifted.len,plain.len);
+ }
+ const bass=normalizeBassStep({note:36,steps:2,performance:{start:0,duration:2,nudge:-.1}});
+ assert.equal(bass.performance.nudge,-.1);
+ assert.equal(quantizedTiming(bass.performance,100).at,159000);
+ assert.equal(normalizeBassStep({note:36,performance:{start:0,duration:1,nudge:Infinity}}).performance.nudge,undefined);
+});
 test('quantize 0/70/100 interpolates original attacks/releases without mutation',()=>{
   const raw={start:2.2,duration:1.1};
   assert.deepEqual(quantizedTiming(raw,0),{at:22000,len:11000});
@@ -47,8 +58,8 @@ test('controller keeps all attacks, QNT is reversible after reload, Undo restore
   assert.equal(cellEvents(h.p.inspect().progression[0]).length,2);
   assert.equal(cellEvents(h.p.inspect().bassProgression[0]).length,2);
   const original=JSON.stringify(h.p.inspect().progression);
-  h.page('SEQ');h.p.knob(5,63);h.p.knob(5,7);
-  assert.equal(h.p.inspect().settings.quantize,70);
+  h.p.arm(false);h.page('SEQ');h.p.knob(5,63);h.p.knob(5,7);
+  assert.equal(h.p.inspect().clips.parts.chord.clips[0].quantize,70);
   assert.equal(h.commands.findLast(c=>c.op==='slot'&&c.index===0).at,300);
   assert.equal(JSON.stringify(h.p.inspect().progression),original);
   h.p.knob(5,-63);h.p.knob(5,-7);

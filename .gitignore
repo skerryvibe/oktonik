@@ -2,3 +2,15 @@ dist/
 build/
 node_modules/
 .DS_Store
+diagnostics/
+migration-local*/
+.env
+.env.*
+*.pem
+*.key
+*.log
+*.tar.gz
+*.zip
+project-data/
+recordings/
+captures/

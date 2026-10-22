@@ -5,7 +5,7 @@ import { SCALES, EXTENSIONS, buildChordBank, chordNotes, melodyNotes, applyModif
   chordName, degreeName, voiceLeadNotes } from '../src/theory.mjs';
 import { STATE_PATH, decodeDocument, encodeDocument } from '../src/settings.mjs';
 
-function setup(files = new Map()) {
+function setup(files = new Map([[STATE_PATH, encodeDocument({bassEnabled:false,bassGesture:false}, [])]])) {
   const commands = [];
   const pilot = createPilot({ read: path => files.get(path),
     write: (path, data) => { files.set(path, data); return true; },
@@ -103,9 +103,10 @@ test('modifiers prepare the next attack without changing held notes; last-held s
   pilot.pad(X[0], true);
   assert.equal(commands.length, count);
   assert.deepEqual(pilot.inspect().voices, previous);
+  const held = voice(pilot, 8);
   pilot.pad(C[1], true);
   assert.deepEqual(pitchSet(voice(pilot, 1)), [1,4,7,9]); // A7
-  assert.ok(pitchSet(voice(pilot, 1)).includes(pc(voice(pilot, 8)[0])));
+  assert.deepEqual(voice(pilot, 8), held); // the held melody note is not re-struck
   pilot.pad(X[0], false);
   assert.deepEqual(pitchSet(voice(pilot, 1)), [1,4,7,9]); // stays A7
   pilot.pad(X[2], true); pilot.pad(X[3], true);
@@ -153,13 +154,15 @@ test('voice leading reduces C to F movement, respects locked bass, and never dri
   }
 });
 
-test('held melody keeps a shared tone, then takes the nearest new chord tone', () => {
-  const { pilot } = setup(new Map([[STATE_PATH, encodeDocument({ melodyMode: 'chord', melodyOctave: 0 }, [])]]));
+test('held CHORD-mode melody keeps sounding through chord changes; the next press follows', () => {
+  const { pilot } = setup(new Map([[STATE_PATH, encodeDocument({ melodyMode: 'chord', melodyOctave: 0, bassGesture: false }, [])]]));
   pilot.pad(C[0], true); pilot.pad(M[0], true); // C4
-  pilot.pad(C[3], true); // F: retains C4
+  pilot.pad(C[3], true); // F
   assert.deepEqual(voice(pilot, 8), [60]);
-  pilot.pad(C[4], true); // G: B3 is closest
-  assert.deepEqual(voice(pilot, 8), [59]);
+  pilot.pad(C[4], true); // G: still the held C4, not re-struck
+  assert.deepEqual(voice(pilot, 8), [60]);
+  pilot.pad(M[0], false); pilot.pad(M[0], true); // a new press plays a G chord tone
+  assert.ok([7,11,2].includes(voice(pilot, 8)[0] % 12));
   pilot.panic();
   assert.equal(pilot.inspect().voices.length, 0);
 });

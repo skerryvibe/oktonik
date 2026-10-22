@@ -2,6 +2,121 @@
   "title": "OKTONIK Lab",
   "children": [
     {
+      "title": "Register and approach colour",
+      "lines": [
+        "LEAD: OFF, CNTR or FREE.",
+        "OCT anchors the chord register.",
+        "Also Track 1, EXPR, knob 4 REG.",
+        "FREE compares the older LEAD.",
+        "Manual INV locks still win.",
+        "IDEAS knob 5 APPR: BASIC/PROFILE.",
+        "Also colours ordinary II/V/SUB.",
+        "Pad assignments do not change.",
+        "BASIC is the default.",
+        "PROFILE uses style and target.",
+        "These changes affect next attacks."
+      ]
+    },
+    {
+      "title": "Shared chord library",
+      "lines": [
+        "Pad EDIT TYPE + EXT builds recipes.",
+        "MAJ + 7b5: dominant 7b5.",
+        "MIN + 7b5: half-diminished m7b5.",
+        "MIN + 6/9: minor 6/9.",
+        "SUS4 + 9: suspended ninth.",
+        "7b9, 7#9, 7#11, 7b13 available.",
+        "MAJ9#11 and 13(no11) available.",
+        "AUTO restores profile inheritance.",
+        "Old projects retain old palettes.",
+        "Reselect PROF for revised palettes.",
+        "Saved clips and CUSTOM stay intact."
+      ]
+    },
+    {
+      "title": "Editable modifier pads",
+      "lines": [
+        "Shift + modifier pad: edit.",
+        "Knob 1: function. Back: exit.",
+        "Or PLAY, jog to MOD PADS.",
+        "Display follows modifier rows.",
+        "Turn a knob to assign its pad.",
+        "STOP remains fixed.",
+        "ADD7: scale seventh, if possible.",
+        "b7 / MAJ7: exact seventh.",
+        "ADD9: add a major ninth.",
+        "ADD6, 6/9: additive colours.",
+        "b9/#9/#11/b13: upper tensions.",
+        "VIIo/: diminished below target.",
+        "CT DIM: same-root diminished.",
+        "iv7/, bVII7/: backdoor choices.",
+        "ROOT: bypass inversion/LEAD.",
+        "SHELL: fewer identity tones.",
+        "Existing colours are retained.",
+        "Hold modifier, then play chord.",
+        "PLAY previews resulting chords.",
+        "Hold BORROW + press jog: latch.",
+        "Release pads before editing.",
+        "Assignments save per project."
+      ]
+    },
+    {
+      "title": "Right-hand bass pads",
+      "lines": [
+        "BASS knob 3 R.PAD: BASS.",
+        "Left pads keep playing chords.",
+        "Right pads play monophonic bass.",
+        "Bass octave, output, SUST, AT.",
+        "Notes follow melody MODE/ADAPT.",
+        "Automatic live bass is replaced.",
+        "Last press wins; no release jump.",
+        "Release pads before switching.",
+        "R.PAD MELODY restores melody."
+      ]
+    },
+    {
+      "title": "Smart Bass",
+      "lines": [
+        "Enable BASS and play a chord.",
+        "Keep held, or use SUST HOLD.",
+        "Track 2, jog to B.EXTRA.",
+        "Knob 4 SMART; R.PAD MELODY.",
+        "Choose a real chord-tone bass.",
+        "Chord does not retrigger.",
+        "Next chord resets this choice.",
+        "Released pedal notes stay off.",
+        "Pads still play bass roots.",
+        "STOP clears sounding notes."
+      ]
+    },
+    {
+      "title": "Extension profiles",
+      "lines": [
+        "PLAY, jog once to EXT PROF.",
+        "Knob 4 PROF: select palette.",
+        "Upper row: V, VI, VII, PROF.",
+        "Lower row: I, II, III, IV.",
+        "Cells show the actual chords.",
+        "Plain to rich: POP CLAS 7THS LOFI",
+        "SOUL NEO JAZZ ALT BOSSA GOSPL",
+        "BLUES AMB. Old projects map to",
+        "the closest of these twelve.",
+        "Minor scales use minor recipes.",
+        "Best with Major or Natural Minor.",
+        "KEY and scale never auto-change.",
+        "Octave tonic shares degree I.",
+        "Degree edit copies into CUSTOM.",
+        "One custom slot per project.",
+        "Preset switching keeps CUSTOM.",
+        "Editing a preset replaces CUSTOM.",
+        "GLOB follows the global EXT.",
+        "PLAY EXT turn returns to GLOBAL.",
+        "Pad edits override the profile.",
+        "Saved clips remain unchanged.",
+        "Back returns to PLAY."
+      ]
+    },
+    {
       "title": "Shift extra pages",
       "lines": [
         "Hold Shift for page extras.",
@@ -89,7 +204,7 @@
         "One level; no redo or saved history.",
         "Manual step edits clear Undo.",
         "R.PRT controls what is recorded.",
-        "QNT on SEQ; Capture/clips later."
+        "CLIPS: LEN, RATE, QNT and PAGE."
       ]
     },
     {
@@ -134,7 +249,7 @@
         "FIXED uses knob 2 B.VEL.",
         "New projects start with PAD.",
         "Old projects retain FIXED.",
-        "FOLLOW sequence uses B.VEL.",
+        "FOLW sequence uses B.VEL.",
         "CLIP keeps recorded velocity."
       ]
     },
@@ -165,7 +280,7 @@
         "Each part follows its own SUST.",
         "Next press starts a new chord.",
         "Nearest bass octave is used.",
-        "Shift + Step saves slash bass.",
+        "Pad + Step saves slash bass.",
         "EDIT and ARP notes stay intact."
       ]
     },
@@ -232,7 +347,8 @@
         "SPRD: voicing width; starts CLOSE.",
         "LEAD: smooth changes; starts OFF.",
         "Inversion is edited per pad.",
-        "Knob 7 STRUM: note spacing. Shift: DIV.",
+        "Knob 7 STRUM: note spacing.",
+        "Track 1, jog to EXPR: DIV/VOICE.",
         "Hold Shift for strum controls.",
         "Shift + chord pad: edit that pad.",
         "OCT: chord register.",
@@ -282,8 +398,8 @@
         "M.OCT: melody octave.",
         "ADAPT: available in SCALE mode.",
         "Shift+MELODY: TRACK and AT.",
-        "TRACK: held notes in CHORD mode.",
-        "NEAR: nearest new chord tone.",
+        "Held notes stay on chord change.",
+        "TRACK: octave shift, NEAR/PAD.",
         "PAD: fixed chord-tone position.",
         "Shared notes always restrike.",
         "Root: purple. Chord tones: blue.",
@@ -345,7 +461,7 @@
     {
       "title": "Lock BORROW",
       "lines": [
-        "Shift + BORROW: lock/unlock.",
+        "Hold BORROW + press jog: lock/unlock.",
         "Blue BORROW pad and header B: locked.",
         "No need to keep holding BORROW.",
         "II / DOM / SUB use borrowed targets.",
@@ -412,7 +528,7 @@
         "Suggestions stay on the same pads.",
         "NEW/STYLE refresh deliberately.",
         "Sounding notes are not changed.",
-        "Shift + Step: save played idea.",
+        "Idea pad + Step: save it.",
         "Capture also stores ideas.",
         "Original chord pads stay untouched.",
         "Turn OFF or leave page to return.",
@@ -433,15 +549,55 @@
         "GATE: chord duration.",
         "HOLD overrides gate at 100%.",
         "PART knob 4: CHORD / BASS.",
-        "Capture button: auto-fill chords.",
+        "Capture saves recent live playing.",
         "All 16 steps can store chords.",
         "S.VEL (knob 5): step velocity.",
         "Range 1-127 for preview and loop.",
-        "Shift + Step: store active chord.",
+        "Hold pad + Step: store that chord.",
         "Stored voicing and key stay fixed.",
         "Global SPRD/LEAD do not change it.",
         "Delete + Step: clear that slot.",
         "Play arms; Shift + Play disarms."
+      ]
+    },
+    {
+      "title": "Step gestures (Move style)",
+      "lines": [
+        "Tap empty step: store last played.",
+        "Hold chord pad + steps: place chord.",
+        "Hold step + later step: set length.",
+        "Hold step + Left/Right: nudge 10%.",
+        "Hold Shift as well: nudge 1%.",
+        "Copy + step, then step: copy it.",
+        "Delete + step: clear. Pad + step: overwrite.",
+        "Hold Loop + step 1/2/4: clip length.",
+        "Play starts and stops SEQ.",
+        "Faint steps: a note still sounding.",
+        "REC while playing punches in at once.",
+        "COUNT only counts in from stop.",
+        "SEQ knob 7 COUNT, knob 8 METRO.",
+        "METRO ON: with Play. REC: recording."
+      ]
+    },
+    {
+      "title": "Shift + step shortcuts",
+      "lines": [
+        "Hold Shift: icons under the steps light.",
+        "Lit step: on. METRO blue ON, red REC.",
+        "2 MIDI page.",
+        "3 SETUP: QNT amount, COUNT, METRO,",
+        "  metro volume, Track 1 REC part.",
+        "5 ARP free tempo (A.CLOCK).",
+        "6 METRO OFF/ON/REC.",
+        "7 STRUM menu; knob 5 turns strum on/off.",
+        "8 Right pads MEL/BASS.",
+        "9 SCALE: key, scale, melody.",
+        "10 Full velocity (127).",
+        "11 ARP on/off.",
+        "14 New empty clip for this part.",
+        "15 Double the loop and its notes.",
+        "16 Quantize clip (PLAY: all parts) / off.",
+        "13 stays Schwung's tool menu."
       ]
     },
     {
@@ -459,7 +615,7 @@
         "Knob 8 R.PRT: BOTH/CHORD/BASS.",
         "Explicit LEN overrides GATE.",
         "Later attacks interrupt long notes.",
-        "Capture is still auto-fill only."
+        "Capture works without REC too."
       ]
     },
     {
@@ -467,7 +623,7 @@
       "lines": [
         "BOTH records chord and enabled bass.",
         "Gesture changes are separate notes.",
-        "Shift+BASS knob 3: FOLLOW / CLIP.",
+        "Shift+BASS knob 3: FOLW / CLIP.",
         "New bass recording selects CLIP.",
         "SEQ PART chooses editing lane.",
         "Hold saved step: temporary editor.",

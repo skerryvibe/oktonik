@@ -6,7 +6,7 @@ import {createProjectPilot,ACTIVE_SET_PATH,projectStatePath} from '../src/projec
 import {renderScreen} from '../src/display.mjs';
 
 for(const profile of ['public','lab'])test(`${profile} PLAY uses the same eight controls and MIDI behaviour as CHORD`,()=>{
-  const expected=['key','scaleId','extension','octave','spread','voiceLead','strumMs','chordSustain'];
+  const expected=['key','octave','extension','scaleId','spread','voiceLead','strumMs','chordSustain'];
   for(let knob=0;knob<8;knob++){
     const a=setup(profile),b=setup(profile);b.pilot.changePage(1);
     assert.deepEqual(a.pilot.inspect().model.cells.map(c=>c.id),expected);
@@ -32,7 +32,7 @@ test('Lab PLAY touch holds parameter info, preserves map and returns to active h
   assert.equal(commands.length,n);assert.deepEqual(pilot.inspect().model.chordMap,map);
   pilot.knob(0,1);assert.equal(pilot.inspect().model.detail,'Key: Db');
   pilot.focus(0,false);settle();
-  const model=pilot.inspect().model;assert.equal(model.detail,`${model.chordLabel} | ${model.degreeLabel}`);
+  const model=pilot.inspect().model;assert.equal(model.detail,`${model.detail.split(' ')[0]} Major | ${model.degreeLabel}`);
   pilot.changePage(PAGES.indexOf('MIDI'));pilot.knob(1,63);pilot.changePage(-PAGES.indexOf('MIDI'));
   pilot.knob(6,1);assert.equal(pilot.inspect().model.detail,'Strum: 5ms');
 });
@@ -49,7 +49,7 @@ test('Public PLAY touch is silent, shows parameter/value, and returns to map foo
   renderScreen({clear(){},line(){},rect(){},fill(){},text(x,y,t){texts.push([y,t]);}},pilot.inspect().model);
   assert.ok(texts.some(([y,t])=>y===55&&t==='Strum: 5ms'));
   assert.deepEqual(texts.filter(([y])=>y===18||y===40).map(([,t])=>t),['G','Am','Bdim','C','C','Dm','Em','F']);
-  pilot.focus(6,false);settle();assert.equal(pilot.inspect().model.detail,`${pilot.inspect().model.chordLabel} | ${pilot.inspect().model.degreeLabel}`);
+  pilot.focus(6,false);settle();assert.equal(pilot.inspect().model.detail,`${pilot.inspect().model.detail.split(' ')[0]} Major | ${pilot.inspect().model.degreeLabel}`);
   pilot.knob(0,1);assert.equal(pilot.inspect().model.chordMap.items[0].label,'Db');
   assert.equal(pilot.inspect().model.detail,'Key: Db');
 });
@@ -68,38 +68,40 @@ function setup(profile='public',document=null){
   const pilot=createPilot({profile,read:p=>p===STATE_PATH?document:null,write:(p,s)=>{saved=s;return true;},send:c=>commands.push(c)});
   pilot.init();return {pilot,commands,saved:()=>saved};
 }
-test('Public has five pages and simple strum, no experimental controls',()=>{
+test('Public direct page registry retains simple strum and excludes experimental controls',()=>{
   const {pilot}=setup();const names=[],ids=[];
-  for(let i=0;i<5;i++){const m=pilot.inspect().model;names.push(m.pageName);assert.equal(m.pageCount,5);ids.push(...m.cells.map(c=>c.id));pilot.changePage(1);}
+  for(let i=0;i<5;i++){const m=pilot.inspect().model;names.push(m.pageName);ids.push(...m.cells.map(c=>c.id));pilot.changePage(1);}
   assert.deepEqual(names,['PLAY','CHORD','MELODY','BASS','MIDI']);
   assert.equal(pilot.inspect().model.pageName,'PLAY');
   assert.ok(ids.includes('strumMs'));
   for(const id of ['arpEnabled','record','arm','bassPlayback','arpRoute','strumDirection'])assert.ok(!ids.includes(id));
 });
-test('Public cannot arm, capture, record or audition steps; live notes still work',()=>{
+test('Public can arm, record and audition steps but Capture remains inert',()=>{
   const {pilot,commands}=setup();commands.length=0;
-  pilot.play();pilot.arm(true);pilot.record();pilot.capture();pilot.undo();pilot.step(0,true,{shift:true});pilot.step(0,false);
-  assert.equal(commands.length,0);
+  pilot.capture();assert.equal(commands.length,0);
+  pilot.arm(true);pilot.record();assert.equal(pilot.inspect().recordArmed,true);pilot.record();pilot.arm(false);
+  pilot.step(0,true,{shift:true});pilot.step(0,false);
+  assert.ok(commands.some(c=>c.op==='slot'&&c.notes.length));
   assert.equal(pilot.inspect().recordArmed,false);assert.equal(pilot.inspect().armed,false);
   pilot.pad(CHORD_PADS[0],true,100);assert.ok(commands.some(c=>c.op==='on'));
   pilot.pad(CHORD_PADS[0],false);pilot.panic();assert.ok(commands.some(c=>c.op==='kill'));
 });
-test('Public keeps dormant Lab state when saving shared settings',()=>{
+test('Public keeps dormant ARP state and now plays the saved strum shape',()=>{
   const raw=encodeDocument({arpEnabled:true,strumDirection:3,strumTiming:40,strumVelocity:30,bassPlayback:'clip'},[]);
   const original=readSettings(()=>raw);
   const {pilot,commands,saved}=setup('public',raw);
   assert.equal(commands.find(c=>c.op==='arp').enabled,0);
-  assert.equal(pilot.inspect().settings.strumDirection,0);
-  assert.equal(pilot.inspect().settings.strumTiming,0);
-  assert.equal(pilot.inspect().settings.strumVelocity,0);
-  assert.ok(!commands.some(c=>c.op==='slot'||c.op==='bassslot'));
+  assert.equal(pilot.inspect().settings.strumDirection,3);
+  assert.equal(pilot.inspect().settings.strumTiming,40);
+  assert.equal(pilot.inspect().settings.strumVelocity,30);
+  assert.ok(commands.some(c=>c.op==='cliplength'));
   pilot.changePage(1);pilot.knob(0,1);pilot.unload();
   const restored=readSettings(()=>saved());
   for(const k of ['arpEnabled','strumDirection','strumTiming','strumVelocity','bassPlayback'])assert.equal(restored.settings[k],original.settings[k]);
   assert.equal(restored.settings.key,(original.settings.key+1)%12);
   assert.deepEqual(restored.progression,original.progression);
 });
-test('Public Menu only navigates five pages; Lab retains IDEAS',()=>{
+test('Public Menu toggles clips; Lab retains IDEAS',()=>{
   const {pilot}=setup();for(let i=0;i<10;i++){pilot.menu();assert.notEqual(pilot.inspect().model.pageName,'IDEAS');assert.equal(pilot.inspect().ideasEnabled,false);}
   const lab=setup('lab').pilot;for(const page of PAGES){assert.equal(lab.inspect().model.pageName,page);lab.changePage(1);}
 });
@@ -116,7 +118,7 @@ test('Public project changes preserve recorded multi-event lanes for Lab',()=>{
   const pilot=createProjectPilot({profile:'public',now:()=>0,read:p=>p===ACTIVE_SET_PATH?project+'\nDemo':files.get(p),write:(p,s)=>{files.set(p,s);return true;},send:c=>commands.push(c)});
   pilot.init();pilot.changePage(1);pilot.knob(0,1);
   project='two';pilot.resume();assert.equal(pilot.inspect().settings.key,0);
-  assert.ok(!commands.some(c=>c.op==='slot'||c.op==='bassslot'||c.op==='arp'&&c.enabled));
+  assert.ok(commands.some(c=>c.op==='slot'));assert.ok(!commands.some(c=>c.op==='arp'&&c.enabled));
   project='one';pilot.resume();assert.equal(pilot.inspect().settings.key,1);pilot.unload();
   const after=readSettings(()=>files.get(projectStatePath('one','public')));
   assert.deepEqual(after.progression,before.progression);assert.deepEqual(after.bassProgression,before.bassProgression);

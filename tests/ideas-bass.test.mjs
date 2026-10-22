@@ -88,10 +88,10 @@ test('IDEAS bank is opt-in and stable; NEW and COLOR do not alter sounding snaps
   assert.deepEqual(pilot.inspect().bank,original); assert.ok(pilot.inspect().overrides.every(x=>x===null));
 });
 
-test('ideas reuse chord strum, bass, melody, routing, capture and step storage without mutating the regular pads', () => {
+test('ideas reuse chord strum, bass, melody, routing and step storage without mutating the regular pads', () => {
   const {pilot,commands,start,play,files}=setup({bassEnabled:true,bassMode:'low',voiceLead:true,previewRoute:'external',channel:2,
     melodyRoute:'schwung',melodyChannel:3,bassRoute:'move',bassChannel:4,strumMs:10,autoSustain:true});
-  start(); pilot.capture(); pilot.pad(M[1],true); const chord=play(4);
+  start(); pilot.pad(M[1],true); const chord=play(4);pilot.step(0,true,{shift:true});pilot.step(0,false);
   assert.equal(pilot.inspect().active.kind,'idea');
   assert.deepEqual(normalizeChord(pilot.inspect().progression[0]),normalizeChord(chord));
   assert.ok(commands.some(c=>c.op==='on' && c.owner===4 && c.route===1 && c.channel===2 && c.strum_ms===10));
@@ -118,7 +118,7 @@ test('leaving IDEAS restores regular pad mapping without killing held ideas; lat
 
 test('BORROW lock is applied once in IDEAS and II/DOM approach exactly the displayed target', () => {
   const {pilot,start,commands}=setup();
-  pilot.pad(94,true,100,{shift:true}); pilot.pad(94,false); start();
+  pilot.pad(94,true);pilot.mainButton(true);pilot.mainButton(false); pilot.pad(94,false); start();
   const target=structuredClone(pilot.inspect().ideas[0].chord);
   pilot.pad(C[0],true); assert.deepEqual(normalizeChord(pilot.inspect().active.chord),normalizeChord(target));
   pilot.pad(C[0],false); pilot.pad(92,true); pilot.pad(C[0],true);
@@ -126,7 +126,7 @@ test('BORROW lock is applied once in IDEAS and II/DOM approach exactly the displ
   pilot.pad(C[0],false); pilot.pad(92,false); pilot.pad(84,true); pilot.pad(C[0],true);
   assert.equal(pilot.inspect().active.chord.targetOffset,target.rootOffset);
   const count=commands.length, notesBefore=structuredClone(pilot.inspect().voices);
-  pilot.pad(94,true,100,{shift:true}); pilot.pad(94,false);
+  pilot.pad(94,true);pilot.mainButton(true);pilot.mainButton(false); pilot.pad(94,false);
   assert.equal(commands.length,count); assert.deepEqual(pilot.inspect().voices,notesBefore);
 });
 

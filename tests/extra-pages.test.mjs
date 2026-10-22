@@ -47,11 +47,12 @@ test('ensemble channels normalize, allow shared destinations and preserve legacy
 });
 test('melody and bass extras have one parameter home and retain normal-page knob positions',()=>{
   const commands=[];const p=createPilot({send:c=>commands.push(c),write:()=>true});p.init();
-  navigate(p,'MELODY');assert.equal(p.inspect().model.cells[4].id,'melodySustain');
+  navigate(p,'MELODY');assert.equal(p.inspect().model.cells[7].id,'melodySustain');
   assert.ok(!p.inspect().model.cells.some(c=>['melodyFollow','melodyAftertouch'].includes(c.id)));
-  p.shift(true);assert.deepEqual(p.inspect().model.cells.slice(0,2).map(c=>c.id),['melodyFollow','melodyAftertouch']);
-  p.knob(1,1);assert.equal(p.inspect().settings.melodyAftertouch,true);
-  navigate(p,'BASS');p.knob(0,1);assert.equal(p.inspect().model.cells[5].id,'bassSustain');
+  p.knob(5,1);assert.equal(p.inspect().settings.melodyExpression,'poly');
+  p.shift(true);assert.equal(p.inspect().model.cells[0].id,'melodyFollow');
+  assert.equal(p.inspect().model.cells[2].id,'melodyExpressionMin');
+  navigate(p,'BASS');p.knob(0,1);assert.equal(p.inspect().model.cells[7].id,'bassSustain');
   p.shift(true);assert.deepEqual(p.inspect().model.cells.slice(0,3).map(c=>c.id),['bassVelocityMode','bassVelocity','bassPlayback']);
   p.knob(0,1);p.knob(1,-10);const velocity=p.inspect().settings.bassVelocity;
   p.shift(false);p.pad(C[0],true,20);

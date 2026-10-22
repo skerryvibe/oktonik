@@ -1,4 +1,6 @@
 // OKTONIK's musical model. Chords store intent, never cached MIDI notes.
+import {degreeExtension,profileRecipe,PROFILE_RECIPES,approachIntervals} from './harmony-controls.mjs';
+import {EXTRA_PAD_EXTENSIONS,libraryPadIntervals} from './chord-library.mjs';
 const wrap = (n, size = 12) => ((n % size) + size) % size;
 const integer = (value, fallback, min, max) => Number.isFinite(value)
   ? Math.min(max, Math.max(min, Math.trunc(value))) : fallback;
@@ -28,9 +30,9 @@ export const DEFAULT_HARMONY = Object.freeze({
 export const EXTENSIONS = Object.freeze(['TRIAD', '7TH', '9TH', '6', 'ADD9', '11TH', '13TH']);
 export const EXTENSION_ORDER = Object.freeze([0, 3, 4, 1, 2, 5, 6]);
 export const CHORD_TYPES = Object.freeze(['AUTO', 'MAJ', 'MIN', 'DIM', 'AUG', 'SUS2', 'SUS4']);
-export const PAD_EXTENSIONS = Object.freeze(['AUTO', 'TRIAD', '6', 'ADD9', '7', 'MAJ7', '9', 'MAJ9', '11', 'MAJ11', '13', 'MAJ13', 'DIM7']);
+export const PAD_EXTENSIONS = Object.freeze(['AUTO', 'TRIAD', '6', 'ADD9', '7', 'MAJ7', '9', 'MAJ9', '11', 'MAJ11', '13', 'MAJ13', 'DIM7',...EXTRA_PAD_EXTENSIONS]);
 const TYPES = Object.freeze({ MAJ: [0,4,7], MIN: [0,3,7], DIM: [0,3,6], AUG: [0,4,8], SUS2: [0,2,7], SUS4: [0,5,7] });
-export const MELODY_MODES = Object.freeze(['chord', 'scale', 'chromatic']);
+export const MELODY_MODES = Object.freeze(['chord', 'scale', 'chromatic', 'pentatonic', 'blues']);
 export const BASS_OCTAVE_MIN = -5;
 export const BASS_OCTAVE_MAX = 6;
 
@@ -49,7 +51,14 @@ const pitchDistance = (a, b) => {
 export function adaptiveScaleIntervals(rawChord, input = {}) {
   const chord = chordData(rawChord);
   const settings = normalizeHarmony(input);
-  const base = [...selectedScale(settings).intervals];
+  let base = [...selectedScale(settings).intervals];
+  // TARGET is deliberately local to an explicit approach, never a sticky key change.
+  if (input.melodyAdapt === true && input.melodyAdaptTarget === true &&
+      Number.isInteger(chord?.targetOffset) && Array.isArray(chord.targetIntervals)) {
+    const minor = chord.targetIntervals.includes(3) && !chord.targetIntervals.includes(4);
+    const targetScale = minor ? [0,2,3,5,7,8,11] : [0,2,4,5,7,9,11];
+    base = uniqueSorted(targetScale.map(n => wrap(n + chord.targetOffset)));
+  }
   if (!chord || input.melodyAdapt !== true || !base.length) return base;
   const chordPcs = uniqueSorted(chord.intervals.map(interval => wrap(interval + chord.rootOffset)));
   const extras = chordPcs.filter(note => !base.includes(note));
@@ -119,9 +128,10 @@ export function buildChordBank(input = {}) {
   const scale = selectedScale(settings);
   const bank = Array.from({ length: 8 }, (_, index) => {
     const degree = index % scale.intervals.length;
+    const recipe=profileRecipe(input,degree),explicit=typeof recipe==='string'?PROFILE_RECIPES[recipe]:null;
     return {
-      rootOffset: scale.intervals[degree], intervals: extendedStack(scale, degree, settings.extension),
-      degree, source: 'diatonic', register: Math.floor(index / scale.intervals.length),
+      rootOffset: scale.intervals[degree], intervals: explicit?[...explicit]:extendedStack(scale, degree, degreeExtension({...input,extension:settings.extension},degree)),
+      degree, source: explicit?.some(n=>!scale.intervals.includes(wrap(n+scale.intervals[degree])))?'custom':'diatonic', register: Math.floor(index / scale.intervals.length),
       inversion: settings.inversion, spread: settings.spread,
     };
   });
@@ -162,6 +172,7 @@ export function chordType(chord) {
 }
 
 function explicitIntervals(type, extension) {
+  const shared=libraryPadIntervals(type,extension);if(shared)return shared;
   const triad = [...(TYPES[type] || TYPES.MAJ)];
   if (extension === 'TRIAD') return triad;
   if (extension === 'DIM7') return [0,3,6,9];
@@ -178,12 +189,25 @@ function replaceType(intervals, type) {
   return uniqueSorted([...TYPES[type], ...intervals.filter(n => n >= 9)]);
 }
 
-export function buildPadChord(input = {}, index = 0, override = {}) {
+// All eight pads at once. Pads without edits share one bank; same result as
+// calling buildPadChord per pad, without rebuilding the bank eight times.
+export function buildPadBank(input = {}, overrides = []) {
+  let shared = null;
+  return Array.from({ length: 8 }, (_, index) => {
+    const override = overrides[index] || {};
+    if (Object.keys(override).length) return buildPadChord(input, index, override);
+    shared ??= buildChordBank({ ...input, ...normalizeHarmony(input) });
+    return buildPadChord(input, index, override, shared);
+  });
+}
+
+export function buildPadChord(input = {}, index = 0, override = {}, sharedBank = null) {
   const settings = normalizeHarmony(input);
   let chord = override.customChord ? chordData(override.customChord)
-    : buildChordBank({ ...settings, ...override })[index];
+    : (sharedBank || buildChordBank({ ...input, ...settings, ...override,
+      ...(Number.isInteger(override.extension)?{extensionProfile:'global'}:{}) }))[index];
   if (!chord) return null;
-  chord = applyModifiers(chord, override.variant, settings);
+  chord = applyModifiers(chord, override.variant, {...input,...settings});
   if (Number.isInteger(override.rootOffset)) chord = { ...chord, rootOffset: wrap(override.rootOffset), source: 'custom' };
   const type = override.chordType && override.chordType !== 'AUTO' ? override.chordType : chordType(chord);
   const explicit = PAD_EXTENSIONS.includes(override.extensionName) && override.extensionName !== 'AUTO';
@@ -240,11 +264,15 @@ export function applyModifiers(rawChord, modifiers = {}, input = {}) {
   if (!chord) return null;
   let result = modifiers.borrow ? borrowedChord(chord, input) : { ...chord, intervals: [...chord.intervals] };
   const target = result;
+  const approaches={dimTo:[11,[0,3,6,9],'leading'],commonDim:[0,[0,3,6,9],'commonDim'],
+    backdoor:[10,[0,4,7,10],'backdoor'],minorIV:[5,[0,3,7,10],'minorIV']};
+  const approach=approaches[modifiers.approach];
+  if(approach)result={...target,rootOffset:wrap(target.rootOffset+approach[0]),intervals:[...approach[1]],
+    source:approach[2],targetOffset:target.rootOffset,targetIntervals:[...target.intervals]};
   if (modifiers.sub || modifiers.ii || modifiers.dom) {
     const mode = modifiers.sub ? 'sub' : modifiers.ii ? 'ii' : 'dom';
-    const minor = target.intervals.includes(3) && !target.intervals.includes(4);
     result = { ...target, rootOffset: wrap(target.rootOffset + (mode === 'sub' ? 1 : mode === 'ii' ? 2 : 7)),
-      intervals: mode === 'ii' ? [0,3,minor ? 6 : 7,10] : [0,4,7,10],
+      intervals: approachIntervals(mode,target,input),
       source: mode === 'sub' ? 'substitute' : mode === 'ii' ? 'approach' : 'secondary',
       targetOffset: target.rootOffset, targetIntervals: [...target.intervals] };
   }
@@ -257,8 +285,44 @@ export function applyModifiers(rawChord, modifiers = {}, input = {}) {
   }
   if (modifiers.sus === 2 || modifiers.sus === 4) {
     result.intervals = result.intervals.filter(n => n !== 3 && n !== 4);
-    result.intervals.push(modifiers.sus === 2 ? 2 : 5);
+    const tone=modifiers.sus===2?2:5;
+    if(!result.intervals.includes(tone)&&result.intervals.length<8)result.intervals.push(tone);
   }
+  if (['add7','flat7','maj7'].includes(modifiers.seventh)) {
+    let seventh=modifiers.seventh==='maj7'?11:10;
+    if(modifiers.seventh==='add7') {
+      // Existing seventh wins. For off-scale/functional chords use the
+      // dominant/minor seventh; on-scale chords use their scale's seventh.
+      const scale=selectedScale(normalizeHarmony(modifiers.borrow?{...input,scaleId:borrowedScaleId(input)}:input));
+      const degree=scale.intervals.indexOf(result.rootOffset);
+      if(result.intervals.includes(3)&&result.intervals.includes(6)&&result.intervals.includes(9))seventh=9;
+      else if(result.intervals.includes(11))seventh=11;
+      else if(result.intervals.includes(10))seventh=10;
+      else if(degree>=0 && scale.intervals.length===7 && !['secondary','approach','substitute'].includes(result.source))
+        seventh=scaleTone(scale,degree+6)-scaleTone(scale,degree);
+    } else {
+      const diminished7=result.intervals.includes(3)&&result.intervals.includes(6)&&result.intervals.includes(9);
+      result.intervals=result.intervals.filter(n=>n%12!==10&&n%12!==11&&!(diminished7&&n===9));
+    }
+    if(!result.intervals.some(n=>n%12===seventh%12)&&result.intervals.length<8)result.intervals.push(seventh);
+  }
+  if(modifiers.add9 && !result.intervals.some(n=>n%12===2) && result.intervals.length<8)result.intervals.push(14);
+  const add=tone=>{if(!result.intervals.some(n=>n%12===tone%12)&&result.intervals.length<8)result.intervals.push(tone);};
+  if(modifiers.add6)add(9);
+  // Replace the upper natural tension, never a structural third/fifth/sus.
+  // #9 can coexist with a minor third: they share a pitch class, so no duplicate.
+  if(['flat9','sharp9'].includes(modifiers.ninth)) {
+    result.intervals=result.intervals.filter(n=>!(n>=12&&[1,2,3].includes(n%12)));
+    add(modifiers.ninth==='flat9'?13:15);
+  }
+  if(modifiers.sharp11){result.intervals=result.intervals.filter(n=>!(n>=12&&n%12===5));add(18);}
+  if(modifiers.flat13){result.intervals=result.intervals.filter(n=>!(n>=12&&n%12===9));add(20);}
+  if(modifiers.shell) {
+    const identity=result.intervals.filter(n=>[2,3,4,5,6,8,9,10,11].includes(n));
+    result.intervals=[0,...identity];
+    if(result.intervals.length===1&&target.intervals.includes(7))result.intervals.push(7);
+  }
+  if(modifiers.root){result.inversion=0;result.lockInversion=true;}
   result.intervals = uniqueSorted(result.intervals);
   return result;
 }
@@ -267,20 +331,86 @@ export function applyModifiers(rawChord, modifiers = {}, input = {}) {
 // anchor never follows the previous chord, so repeated cycles cannot drift.
 export function voiceLeadNotes(chord, settings = {}, previous = []) {
   const plain = chordNotes(chord, settings);
-  if (!plain.length || !settings.voiceLead || chord.lockInversion || !previous.length) return plain;
+  if (!plain.length || !settings.voiceLead || chord.lockInversion) return plain;
+  const centered=settings.leadRegister!=='free';
+  if(!centered&&!previous.length)return plain;
+  if(chord.spread)return spreadLeadNotes(chord, settings, previous, centered, plain);
   const normalized = normalizeHarmony(settings);
   const anchor = 48 + normalized.key + normalized.octave * 12;
+  const center=anchor+7;
+  const orderedPrevious=[...previous].sort((a,b)=>a-b);
+  // Only root, third or fifth go in the bass: a seventh or tension below the
+  // chord muddies it and reads as a different harmony.
+  const inversions=Math.min(3,chord.intervals.length);
   let best = plain, bestScore = Infinity;
-  for (let inversion = 0; inversion < Math.min(chord.intervals.length, 4); inversion++) {
+  for (let inversion = 0; inversion < inversions; inversion++) {
     const base = chordNotes({ ...chord, inversion }, settings);
     for (let shift = -24; shift <= 24; shift += 12) {
       const notes = base.map(n => n + shift);
       if (notes[0] < Math.max(0, anchor - 12) || notes[0] > Math.min(115, anchor + 12)
           || notes[notes.length - 1] > 127) continue;
-      const distance = (a, b) => a.reduce((sum, n) => sum + Math.min(...b.map(m => Math.abs(n - m))), 0);
       const shared = notes.filter(n => previous.includes(n)).length;
-      const score = distance(notes, previous) + distance(previous, notes)
-        - shared * 3 + Math.abs(notes[0] - plain[0]) * 0.08;
+      const centerDistance=Math.abs(meanOf(notes)-center);
+      const score = (previous.length?distance(notes, previous) + distance(previous, notes):0)
+        // Equal-size chords have real ordered voices, not multiple notes
+        // all claiming the same nearest neighbour. Preserve their register.
+        + (notes.length===previous.length?notes.reduce((s,n,i)=>s+Math.abs(n-orderedPrevious[i]),0):0)
+        - shared * 3 + Math.abs(notes[0] - plain[0]) * 0.08 + mud(notes)
+        + (centered?centerDistance*2+Math.max(0,centerDistance-4)*64:0);
+      if (score < bestScore) { best = notes; bestScore = score; }
+    }
+  }
+  return best;
+}
+
+const meanOf = list => list.reduce((sum, n) => sum + n, 0) / list.length;
+const distance = (a, b) => a.reduce((sum, n) => sum + Math.min(...b.map(m => Math.abs(n - m))), 0);
+// Seconds low in the register blur on most synths.
+const mud = notes => notes.reduce((sum, n, i) => i && notes[i - 1] < 53 && n - notes[i - 1] <= 2 ? sum + 8 : sum, 0);
+
+// OPEN and WIDE play like two hands: the root alone in the bass, in a fixed
+// window near OCT, and the other tones above it. Only the upper voices are
+// voice-led, so the top line moves smoothly while the bass stays put.
+function spreadLeadNotes(chord, settings, previous, centered, plain) {
+  const normalized = normalizeHarmony(settings);
+  const anchor = 48 + normalized.key + normalized.octave * 12;
+  const rootPc = wrap(normalized.key + chord.rootOffset);
+  const bass = anchor - 5 + wrap(rootPc - (anchor - 5));
+  const tones = uniqueSorted(chord.intervals.map(n => wrap(n)).filter(n => n !== 0));
+  if (!tones.length || bass > 127) return plain;
+  const wide = chord.spread === 2, floor = bass + (wide ? 10 : 5);
+  // Rotation r puts tone r lowest above the floor. WIDE then stacks the rest
+  // with narrowing gaps; OPEN lifts the second voice an octave (drop-2 shape).
+  const above = (n, min) => n + 12 * Math.max(0, Math.ceil((min - n) / 12));
+  const shape = r => {
+    let last = above(tones[r] + bass, floor), out = [last], rest = tones.filter((_, i) => i !== r).map(n => n + bass);
+    for (let i = 1; rest.length; i++) {
+      const min = last + (wide ? [3, 2][i - 1] ?? 1 : 1);
+      let pick = 0;
+      rest.forEach((n, j) => { if (above(n, min) < above(rest[pick], min)) pick = j; });
+      last = above(rest[pick], min); out.push(last); rest = rest.filter((_, j) => j !== pick);
+    }
+    if (!wide && out.length >= 3) out[1] += 12;
+    return uniqueSorted(out);
+  };
+  // The target register is fixed by OCT, never by this chord's bass, so CNTR
+  // does not turn into parallel motion.
+  const plainUpper = plain.slice(1), center = anchor + meanOf(plainUpper) - plain[0];
+  const prevUpper = [...previous].sort((a, b) => a - b).slice(1);
+  let best = plain, bestScore = Infinity;
+  for (let r = 0; r < tones.length; r++) {
+    const base = shape(r);
+    for (const lift of [0, 12]) {
+      const upper = base.map(n => n + lift);
+      if (upper[upper.length - 1] > 127) continue;
+      const notes = [bass, ...upper];
+      const centerDistance = Math.abs(meanOf(upper) - center);
+      const score = (prevUpper.length ? distance(upper, prevUpper) + distance(prevUpper, upper)
+          + (upper.length === prevUpper.length ? upper.reduce((s, n, i) => s + Math.abs(n - prevUpper[i]), 0) : 0)
+          - upper.filter(n => prevUpper.includes(n)).length * 3 : 0)
+        + Math.abs(upper[0] - plainUpper[0]) * 0.08 + mud(notes)
+        // FREE may wander, but only within about an octave of the target.
+        + (centered ? centerDistance * 2 + Math.max(0, centerDistance - 5) * 64 : Math.max(0, centerDistance - 9) * 64);
       if (score < bestScore) { best = notes; bestScore = score; }
     }
   }
@@ -325,6 +455,24 @@ function fitMidiTogether(notes) {
   return sorted.map(note => note + shift);
 }
 
+// WIDE keeps the bass alone, leaves about a seventh or tenth above it, then
+// stacks the remaining tones upward with narrowing gaps, as the harmonic
+// series does. The span stays near two octaves however many tones there are.
+const WIDE_GAPS = [10, 3, 2, 2, 1, 1, 1, 1];
+function wideIntervals(sorted) {
+  const [bass, ...rest] = sorted, out = [bass];
+  let pending = rest, last = bass;
+  for (let i = 0; pending.length; i++) {
+    const min = last + WIDE_GAPS[Math.min(i, WIDE_GAPS.length - 1)];
+    const place = n => n + 12 * Math.max(0, Math.ceil((min - n) / 12));
+    let pick = -1;
+    pending.forEach((n, j) => { if (pick < 0 || place(n) < place(pending[pick])) pick = j; });
+    last = place(pending[pick]); out.push(last);
+    pending = pending.filter((_, j) => j !== pick);
+  }
+  return out;
+}
+
 export function chordNotes(rawChord, input = {}) {
   const chord = chordData(rawChord);
   if (!chord) return [];
@@ -344,11 +492,8 @@ export function chordNotes(rawChord, input = {}) {
       ? interval + 12 * Math.max(1, Math.ceil((bass - interval) / 12)) : interval);
   }
   intervals.sort((a, b) => a - b);
-  intervals = intervals.map((interval, i) => {
-    if (chord.spread === 1 && i % 2 === 1) return interval + 12;
-    if (chord.spread === 2 && i > 0) return interval + Math.ceil(i / 2) * 12;
-    return interval;
-  });
+  if (chord.spread === 2) intervals = wideIntervals(intervals);
+  else if (chord.spread === 1) intervals = intervals.map((interval, i) => i % 2 === 1 ? interval + 12 : interval);
   const root = 48 + settings.key + chord.rootOffset + (settings.octave + chord.register) * 12;
   return fitMidiTogether(intervals.map(interval => root + interval));
 }
@@ -358,7 +503,8 @@ export function melodyNotes(rawChord, input = {}) {
   if (!chord) return [];
   const settings = normalizeHarmony(input);
   const mode = MELODY_MODES.includes(input.melodyMode) ? input.melodyMode : 'chord';
-  const tones = mode === 'scale' ? adaptiveScaleIntervals(chord, { ...input, ...settings })
+  const tones = mode === 'pentatonic' || mode === 'blues' ? soloScaleIntervals(input)
+    : mode === 'scale' ? adaptiveScaleIntervals(chord, { ...input, ...settings })
     : mode === 'chromatic' ? Array.from({ length: 12 }, (_, i) => i)
     : uniqueSorted(chord.intervals.map(interval => wrap(interval)));
   const octave = integer(input.melodyOctave, settings.octave, -3, 3);
@@ -369,6 +515,16 @@ export function melodyNotes(rawChord, input = {}) {
     const note = root + tones[i % tones.length] + 12 * Math.floor(i / tones.length);
     return note >= 0 && note <= 127 ? note : null;
   });
+}
+
+// Solo palettes do not alter the chord bank or chase every chord root.
+// Blues tensions are intentional: do not silently replace them via ADAPT.
+export function soloScaleIntervals(input = {}) {
+  const minor = input.melodySoloType === 'minor' || (input.melodySoloType !== 'major' &&
+    selectedScale(normalizeHarmony(input)).intervals.includes(3));
+  return input.melodyMode === 'blues'
+    ? minor ? [0,3,5,6,7,10] : [0,2,3,4,7,9]
+    : minor ? [0,3,5,7,10] : [0,2,4,7,9];
 }
 
 export function explicitBassNote(chord, input = {}) {
@@ -441,8 +597,19 @@ const SUFFIXES = new Map([
   [[0, 2, 3, 5, 7, 10], 'm11'], [[0, 2, 3, 5, 7, 11], 'm(maj11)'],
   [[0, 2, 4, 6, 7, 11], 'maj9#11'],
   [[0, 2, 4, 5, 7, 9, 10], '13'], [[0, 2, 4, 5, 7, 9, 11], 'maj13'],
+  [[0, 2, 4, 7, 9, 10], '13'],
+  [[0, 2, 4, 7, 9, 11], 'maj13'],
   [[0, 2, 3, 5, 7, 9, 10], 'm13'], [[0, 2, 4, 6, 7, 9, 11], 'maj13#11'],
   [[0, 4, 9], '6(no5)'], [[0, 3, 10], 'm7(no5)'], [[0, 5, 10], '7sus4(no5)'],
+  [[0,4], '(no5)'], [[0,3], 'm(no5)'], [[0,4,10], '7(no5)'], [[0,4,11], 'maj7(no5)'],
+  [[0,3,11], 'm(maj7,no5)'], [[0,1,4,7], '(b9)'], [[0,3,4,7], '(#9)'],
+  [[0,4,6,7], '(#11)'], [[0,4,6,7,10], '7#11'], [[0,4,6,7,11], 'maj7#11'],
+  [[0,4,7,8], '(b13)'], [[0,4,7,8,10], '7b13'],
+  [[0,4,6,10], '7b5'], [[0,1,4,7,8,10], '7b9b13'],
+  [[0,3,5,6,10], 'm7b5(11)'],
+  [[0,1,3,7,10], 'm7b9'], [[0,3,6,7,10], 'm7#11'],
+  [[0,3,7,8,10], 'm7b13'], [[0,2,3,6,7,11], 'm(maj9#11)'],
+  [[0,2,3,7,9,10], 'm13'],
 ].map(([notes, suffix]) => [notes.join(','), suffix]));
 const INTERVAL_NAMES = ['1', 'b9', '9', 'b3', '3', '11', 'b5', '5', '#5', '6', 'b7', '7'];
 
@@ -479,8 +646,9 @@ export function degreeName(rawChord, input = {}) {
   const chord = chordData(rawChord);
   if (!chord) return '--';
   const scale = selectedScale(normalizeHarmony(input));
-  if (['secondary', 'approach', 'substitute'].includes(chord.source)) {
-    const prefix = chord.source === 'approach' ? (chord.intervals.includes(6) ? 'iiø/' : 'ii/') : chord.source === 'substitute' ? 'subV/' : 'V/';
+  if (['secondary', 'approach', 'substitute','leading','commonDim','backdoor','minorIV'].includes(chord.source)) {
+    const prefix = ({leading:'viio7/',commonDim:'CTo/',backdoor:'bVII7/',minorIV:'iv7/'})[chord.source]
+      || (chord.source === 'approach' ? (chord.intervals.includes(6) ? 'iiø/' : 'ii/') : chord.source === 'substitute' ? 'subV/' : 'V/');
     if (Number.isInteger(chord.targetOffset) && validIntervals(chord.targetIntervals)) {
       return prefix + roman(chord.targetOffset, chord.targetIntervals);
     }

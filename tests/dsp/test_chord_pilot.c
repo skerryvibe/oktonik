@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include "../../src/dsp/chord_pilot.c"
 
@@ -26,6 +27,7 @@ static int usb_send(const uint8_t *msg,int len) { return record(USB,msg,len); }
 static int chain_send(const uint8_t *msg,int len) { return record(CHAIN,msg,len); }
 static int clock_get(void) { return clock_status; }
 static double beat_get(void) { return beat; }
+static float tempo_get(void) { return 123.5f; }
 static void reset(void) {
     memset(pool,0,sizeof(pool));
     memset(&host,0,sizeof(host));
@@ -70,6 +72,120 @@ static int midi_count(int dest,int status,int note) {
     for(int i=0;i<event_count;i++) n+=(dest<0||events[i].dest==dest) &&
         events[i].bytes[1]==status && (note<0||events[i].bytes[2]==note);
     return n;
+}
+static void test_expression_cc_delivery(void) {
+    for(int route=0;route<4;route++)for(int cc=1;cc<=11;cc+=10) {
+        reset();Pilot *s=plugin->create_instance("",0);char cmd[256];
+        snprintf(cmd,sizeof(cmd),"{\"op\":\"on\",\"owner\":0,\"notes\":[60,64,67],\"divisi\":2,\"channels\":[15,4,9,2,6,0,7,3],\"route\":%d,\"cc\":%d,\"amount\":20}",route,cc);
+        command(s,cmd);assert(!s->error);
+        for(int i=0;i<event_count;i++)if((events[i].bytes[1]&0xf0)==0x90) {
+            int found=0;for(int j=0;j<i;j++)found|=events[j].dest==events[i].dest && events[j].bytes[1]==(0xb0|(events[i].bytes[1]&15)) && events[j].bytes[2]==cc && events[j].bytes[3]==20;
+            assert(found);
+        }
+        event_count=0;command(s,"{\"op\":\"express\",\"owner\":0,\"amount\":110}");
+        assert(event_count==(route==2?6:3));for(int i=0;i<event_count;i++)assert(events[i].bytes[2]==cc&&events[i].bytes[3]==110);
+        event_count=0;command(s,"{\"op\":\"off\",\"owner\":0}");
+        for(int i=0;i<event_count;i++)assert((events[i].bytes[1]&0xf0)==0x80);
+        plugin->destroy_instance(s);
+    }
+    groups++;
+}
+static void test_expression_cc_retry_shared_and_stop(void) {
+    reset();Pilot *s=plugin->create_instance("",0);fail_off[MOVE]=1;
+    command(s,"{\"op\":\"on\",\"owner\":0,\"notes\":[60],\"cc\":11,\"amount\":30}");
+    assert(!count(MOVE,1,-1));fail_off[MOVE]=0;tick(s,1);
+    assert(event_count>=2 && events[0].bytes[2]==11 && events[0].bytes[3]==30 && count(MOVE,1,60)==1);
+    command(s,"{\"op\":\"on\",\"owner\":1,\"notes\":[64],\"cc\":11,\"amount\":90}");
+    command(s,"{\"op\":\"express\",\"owner\":0,\"amount\":20}");
+    assert(s->expr_sent[MOVE][0][1]==90);
+    command(s,"{\"op\":\"off\",\"owner\":1}");assert(s->expr_sent[MOVE][0][1]==20);
+    command(s,"{\"op\":\"kill\"}");event_count=0;tick(s,128);assert(!event_count);
+    command(s,"{\"op\":\"express\",\"owner\":0,\"amount\":100}");assert(!event_count);
+    command(s,"{\"op\":\"on\",\"owner\":0,\"notes\":[60],\"cc\":64,\"amount\":127}");assert(s->error);
+    command(s,"{\"op\":\"on\",\"owner\":0,\"notes\":[60],\"cc\":1}");assert(s->error);
+    plugin->destroy_instance(s);groups++;
+}
+static void test_stable_ensemble_core(void) {
+    EnsembleMemory mem={0};uint8_t ids[8];
+    const uint8_t seventh[]={71,60,67,64},triad[]={60,67,71};
+    ensemble_assign(&mem,seventh,4,ids);
+    assert(ids[0]==3 && ids[1]==0 && ids[2]==2 && ids[3]==1);
+    ensemble_assign(&mem,triad,3,ids);
+    assert(ids[0]==0 && ids[1]==2 && ids[2]==3);
+    ensemble_assign(&mem,seventh,4,ids);
+    assert(ids[0]==3 && ids[1]==0 && ids[2]==2 && ids[3]==1);
+    /* Every chord cardinality and MIDI register: unique voices, deterministic
+     * replay, source order preserved, exact tones remain the caller's choice. */
+    for(int base=0;base<120;base+=12)for(int n=1;n<=8;n++) {
+        uint8_t notes[8],again[8];
+        for(int i=0;i<n;i++)notes[i]=(uint8_t)(base+n-1-i);
+        EnsembleMemory a=mem,b=mem;
+        ensemble_assign(&a,notes,n,ids);ensemble_assign(&b,notes,n,again);
+        assert(!memcmp(ids,again,n));
+        for(int i=0;i<n;i++) {
+            assert(ids[i]<8 && a.notes[ids[i]]==notes[i]);
+            for(int j=0;j<i;j++)assert(ids[j]!=ids[i]);
+        }
+        mem=a;
+    }
+    groups++;
+}
+static void test_stable_ensemble_delivery(void) {
+    for(int route=0;route<4;route++) {
+        reset();Pilot *s=plugin->create_instance("",0);char cmd[256];
+        snprintf(cmd,sizeof(cmd),"{\"op\":\"on\",\"owner\":0,\"notes\":[60,64,67,71],\"route\":%d,\"divisi\":2,\"legato\":1}",route);
+        command(s,cmd);assert(!s->error);event_count=0;
+        snprintf(cmd,sizeof(cmd),"{\"op\":\"on\",\"owner\":0,\"notes\":[60,67,71],\"route\":%d,\"divisi\":2,\"legato\":1}",route);
+        command(s,cmd);assert(!count(-1,1,-1));
+        assert(s->voices[0].channels[1]==2 && s->voices[0].channels[2]==3);
+        command(s,"{\"op\":\"off\",\"owner\":0}");event_count=0;
+        /* Another physical chord pad, after all notes were released. */
+        snprintf(cmd,sizeof(cmd),"{\"op\":\"on\",\"owner\":2,\"notes\":[60,67,71],\"route\":%d,\"divisi\":2}",route);
+        command(s,cmd);assert(s->voices[2].channels[1]==2);
+        command(s,"{\"op\":\"kill\"}");assert(!s->ensemble[0].known);
+        for(int i=0;i<CELLS;i++)assert(!s->pitches[i].refs && !s->pitches[i].sent);
+        plugin->destroy_instance(s);
+    }
+    groups++;
+}
+static void test_stable_ensemble_maps_and_retry(void) {
+    reset();Pilot *s=plugin->create_instance("",0);
+    command(s,"{\"op\":\"on\",\"owner\":0,\"notes\":[60,64,67,71],\"divisi\":2,\"channels\":[15,4,4,2,6,0,7,3]}");
+    fail_off[MOVE]=1;event_count=0;
+    command(s,"{\"op\":\"on\",\"owner\":0,\"notes\":[60,67,71],\"divisi\":2,\"legato\":1,\"channels\":[15,4,4,2,6,0,7,3]}");
+    assert(!count(-1,1,-1));assert(s->voices[0].channels[2]==2);
+    fail_off[MOVE]=0;tick(s,1);assert(count(MOVE,0,64)==1);
+    command(s,"{\"op\":\"panic\"}");
+    command(s,"{\"op\":\"on\",\"owner\":0,\"notes\":[60,67,71],\"divisi\":2,\"strum_ms\":100}");
+    event_count=0;command(s,"{\"op\":\"kill\"}");tick(s,128);tick(s,128);
+    assert(!count(-1,1,-1));
+    command(s,"{\"op\":\"on\",\"owner\":0,\"notes\":[60,67,71],\"divisi\":2,\"channel\":15}");
+    assert(s->error && !s->ensemble[0].known);
+    plugin->destroy_instance(s);groups++;
+}
+static void test_stable_ensemble_isolation_and_pedal(void) {
+    reset();Pilot *s=plugin->create_instance("",0);
+    command(s,"{\"op\":\"config\",\"divisi\":2}");
+    command(s,"{\"op\":\"on\",\"owner\":0,\"notes\":[60,64,67,71],\"divisi\":2}");
+    EnsembleMemory live=s->ensemble[0];
+    command(s,"{\"op\":\"on\",\"owner\":8,\"notes\":[30],\"channel\":12}");
+    command(s,"{\"op\":\"on\",\"owner\":9,\"notes\":[80],\"channel\":13}");
+    command(s,"{\"op\":\"slot\",\"index\":0,\"notes\":[48,52,55],\"legato\":1}");
+    command(s,"{\"op\":\"arm\",\"enabled\":1}");clock_status=MOVE_CLOCK_STATUS_RUNNING;tick(s,1);
+    assert(!memcmp(&live,&s->ensemble[0],sizeof(live)) && s->ensemble[1].known);
+    assert(s->voices[LOOP_OWNER].channels[0]==0);
+    command(s,"{\"op\":\"pedal\",\"owner\":0,\"enabled\":1,\"route\":0,\"channel\":0,\"divisi\":2}");
+    for(int i=0;i<8;i++)assert(s->pedal_sent[MOVE][i]);
+    command(s,"{\"op\":\"pressure\",\"owner\":0,\"pressure\":70}");
+    for(int i=0;i<4;i++)assert(pressure_count(MOVE,live.notes[i],70));
+    command(s,"{\"op\":\"off\",\"owner\":0}");
+    assert(!memcmp(&live,&s->ensemble[0],sizeof(live)));
+    command(s,"{\"op\":\"config\",\"divisi\":2,\"channels\":[15,4,9,2,6,0,7,3]}");
+    assert(!s->ensemble[0].known && !s->ensemble[1].known);
+    for(int i=0;i<16;i++)assert(!s->pedal_sent[MOVE][i]);
+    command(s,"{\"op\":\"on\",\"owner\":0,\"notes\":[60,67,71],\"divisi\":2,\"channels\":[15,4,9,2,6,0,7,3]}");
+    assert(s->voices[0].channels[0]==15 && s->voices[0].channels[1]==4 && s->voices[0].channels[2]==9);
+    command(s,"{\"op\":\"kill\"}");plugin->destroy_instance(s);groups++;
 }
 static void test_divisi_routes_and_release(void) {
     const uint8_t notes[8]={72,48,67,60,84,55,76,64};uint8_t channels[8];
@@ -344,6 +460,20 @@ static void test_strum_and_panic(void) {
     assert(count(MOVE,1,69)==0 && count(MOVE,1,72)==0);
     plugin->destroy_instance(s); groups++;
 }
+static void test_selected_page_start(void) {
+    reset();void *instance=plugin->create_instance("",0);Pilot *s=(Pilot *)instance;
+    command(s,"{\"op\":\"cliplength\",\"index\":0,\"duration\":32,\"rate\":2}");
+    command(s,"{\"op\":\"slot\",\"index\":16,\"notes\":[65],\"at\":160000,\"len\":10000}");
+    command(s,"{\"op\":\"arm\",\"enabled\":1,\"origin\":16}");
+    tick(s,10);tick(s,10);assert(event_count==0); /* stopped clock must not eat start offset */
+    clock_status=MOVE_CLOCK_STATUS_RUNNING;beat=0;tick(s,10);
+    assert(count(MOVE,1,65)==1);assert(s->slot==16);assert(s->clip_origin[0]==-16);
+    assert(s->clip_origin[1]==-16 && s->clip_origin[2]==-16);
+    command(s,"{\"op\":\"arm\",\"enabled\":0}");assert(s->start_offset==0);assert(s->clip_origin[0]==0);
+    command(s,"{\"op\":\"arm\",\"enabled\":1,\"origin\":193}");assert(s->armed==0);
+    command(s,"{\"op\":\"arm\",\"enabled\":1}");tick(s,10);assert(s->slot==0);
+    plugin->destroy_instance(instance);groups++;
+}
 static void test_loop_transport_gate(void) {
     void *s;
     reset(); s=plugin->create_instance("",0);
@@ -468,6 +598,19 @@ static void test_lifecycle_capabilities(void) {
     assert(plugin->get_param(s[0],"unknown",buf,sizeof(buf))==-1);
     assert(plugin->get_param(s[0],"state",buf,1)==0 && buf[0]==0);
     plugin->destroy_instance(s[0]); groups++;
+}
+/* Schwung 1.7 destroys on a worker thread after discarding the module's MIDI
+ * rings. The UI's unload panic runs while the DSP is live, so the normal
+ * teardown that follows must emit nothing at all. */
+static void test_unload_teardown_is_silent(void) {
+    reset(); void *s = plugin->create_instance("",0);
+    command(s,"{\"op\":\"on\",\"owner\":0,\"notes\":[60,64,67]}");
+    command(s,"{\"op\":\"pedal\",\"owner\":0,\"enabled\":1}");
+    command(s,"{\"op\":\"arm\",\"enabled\":0}"); command(s,"{\"op\":\"panic\"}");
+    tick(s,10); assert(event_count>0);
+    event_count=0; plugin->destroy_instance(s);
+    assert(event_count==0);
+    groups++;
 }
 static void test_legato_revoice_and_release(void) {
     reset(); void *s = plugin->create_instance("",0);
@@ -1050,6 +1193,164 @@ static void test_seq_unknown_transport_advancing_clock(void) {
     groups++;
 }
 int main(void) {
+    {
+        reset();Pilot *s=plugin->create_instance("",0);uint8_t n=60;
+        start_voice(s,LOOP_OWNER,&n,1,100,0,0,0,0,0);
+        n=36;start_voice(s,LOOP_BASS_OWNER,&n,1,100,0,1,0,0,0);
+        n=72;start_voice(s,MELODY_OWNER,&n,1,100,0,2,0,0,0);
+        command(s,"{\"op\":\"mute\",\"index\":0,\"enabled\":1}");
+        assert(!s->voices[LOOP_OWNER].count && s->voices[LOOP_BASS_OWNER].count && s->voices[MELODY_OWNER].count);
+        n=60;start_voice(s,LOOP_OWNER,&n,1,100,0,0,50,0,0);tick(s,60);assert(count(MOVE,1,60)==1);
+        int before=event_count;
+        command(s,"{\"op\":\"mute\",\"index\":0,\"enabled\":0}");assert(event_count==before);
+        start_voice(s,LOOP_OWNER,&n,1,100,0,0,0,0,0);assert(count(MOVE,1,60)==2);
+        command(s,"{\"op\":\"mute\",\"index\":1,\"enabled\":1}");
+        command(s,"{\"op\":\"mute\",\"index\":2,\"enabled\":1}");
+        assert(!s->voices[LOOP_BASS_OWNER].count&&!s->voices[MELODY_OWNER].count);
+        command(s,"{\"op\":\"mute\",\"index\":3,\"enabled\":1}");assert(s->error);
+        plugin->destroy_instance(s);groups++;
+    }
+    {
+        reset();Pilot *s=plugin->create_instance("",0);
+        command(s,"{\"op\":\"slot\",\"index\":0,\"notes\":[60],\"duration\":1}");
+        command(s,"{\"op\":\"slot\",\"index\":1,\"notes\":[62],\"duration\":1}");
+        command(s,"{\"op\":\"melodyslot\",\"index\":0,\"notes\":[72],\"duration\":1}");
+        command(s,"{\"op\":\"melodyslot\",\"index\":1,\"notes\":[74],\"duration\":1}");
+        command(s,"{\"op\":\"arm\",\"enabled\":1}");clock_status=MOVE_CLOCK_STATUS_RUNNING;tick(s,1);
+        assert(count(MOVE,1,60)==1&&count(MOVE,1,72)==1);
+        command(s,"{\"op\":\"mute\",\"index\":0,\"enabled\":1}");
+        command(s,"{\"op\":\"mute\",\"index\":2,\"enabled\":1}");beat=.3;tick(s,1);
+        command(s,"{\"op\":\"mute\",\"index\":0,\"enabled\":0}");
+        command(s,"{\"op\":\"mute\",\"index\":2,\"enabled\":0}");beat=.4;tick(s,1);
+        assert(count(MOVE,1,60)==1&&count(MOVE,1,72)==1);
+        beat=1.;tick(s,1);assert(count(MOVE,1,62)==1&&count(MOVE,1,74)==1);
+        plugin->destroy_instance(s);groups++;
+    }
+    {
+        reset();host.get_bpm=tempo_get;Pilot *s=plugin->create_instance("",0);int16_t audio[128];
+        command(s,"{\"op\":\"countin\",\"enabled\":1,\"clock\":1}");
+        int previous=-1,clicks=0;
+        for(int i=0;i<4000;i++){
+            plugin->render_block(s,audio,1);
+            if(s->count_step!=previous){previous=s->count_step;clicks++;}
+        }
+        assert(clicks==4 && s->count_state==3 && event_count==0);
+        assert(clock_status==MOVE_CLOCK_STATUS_STOPPED);groups++;
+    }
+    {
+        reset();Pilot *s=plugin->create_instance("",0);char info[256];
+        plugin->get_param(s,"clock",info,sizeof(info));assert(strstr(info,"\"bpm\":0.000"));
+        host.get_bpm=tempo_get;
+        plugin->get_param(s,"clock",info,sizeof(info));
+        assert(strstr(info,"\"bpm\":123.500") && strstr(info,"\"ready\":false"));
+        assert(strlen(info)<sizeof(info)-1 && info[strlen(info)-1]=='}');groups++;
+    }
+    /* Count clicks do not mute or restart existing sequenced accompaniment. */
+    {
+        reset();Pilot *s=plugin->create_instance("",0);int16_t audio[256];clock_status=MOVE_CLOCK_STATUS_RUNNING;
+        command(s,"{\"op\":\"slot\",\"index\":0,\"notes\":[60],\"duration\":4}");
+        command(s,"{\"op\":\"arm\",\"enabled\":1}");command(s,"{\"op\":\"countin\",\"enabled\":1}");
+        plugin->render_block(s,audio,64);assert(count(MOVE,1,60)==1 && s->count_state==2);
+        beat=1;plugin->render_block(s,audio,64);assert(count(MOVE,1,60)==1);
+        clock_status=MOVE_CLOCK_STATUS_STOPPED;tick(s,64);assert(s->count_state==4 && count(MOVE,0,60)==1);groups++;
+    }
+    /* Count-in owns audio only; four beats, no MIDI, no repeat on frozen beats. */
+    {
+        reset();Pilot *s=plugin->create_instance("",0);int16_t audio[256];char info[256];
+        command(s,"{\"op\":\"countin\",\"enabled\":1}");tick(s,64);assert(s->count_state==1);
+        clock_status=MOVE_CLOCK_STATUS_RUNNING;
+        for(int b=0;b<4;b++) {
+            beat=b;plugin->render_block(s,audio,64);
+            int energy=0;for(int i=0;i<128;i++)energy+=audio[i]!=0;
+            assert(energy>0 && s->count_step==b && s->count_state==2);
+            beat=b+.2;tick(s,64);assert(event_count==0);
+        }
+        beat=4;tick(s,64);assert(s->count_state==3 && s->count_end==4.);
+        plugin->get_param(s,"clock",info,sizeof(info));assert(strstr(info,"\"count_state\":3"));
+        assert(strstr(info,"\"count_end\":4"));groups++;
+    }
+    /* Metronome clicks once per beat with an accented bar, yields to count-in, no MIDI. */
+    {
+        reset();Pilot *s=plugin->create_instance("",0);int16_t audio[256];clock_status=MOVE_CLOCK_STATUS_RUNNING;
+        beat=.5;command(s,"{\"op\":\"metro\",\"enabled\":1}");plugin->render_block(s,audio,64);
+        assert(s->click_left==0); /* enabled mid-beat: wait for the next beat */
+        for(int b=1;b<=4;b++) {
+            beat=b;plugin->render_block(s,audio,64);
+            int energy=0;for(int i=0;i<128;i++)energy+=audio[i]!=0;
+            assert(energy>0 && s->click_accent==(b%4==0));
+            beat=b+.3;s->click_left=0;plugin->render_block(s,audio,64);assert(s->click_left==0);
+        }
+        assert(event_count==0);
+        command(s,"{\"op\":\"countin\",\"enabled\":1}");beat=5.5;tick(s,64);beat=8;plugin->render_block(s,audio,64);
+        assert(s->count_state==2 && s->count_step==0 && s->click_accent==1);
+        clock_status=MOVE_CLOCK_STATUS_STOPPED;s->click_left=0;beat=9;tick(s,64);assert(s->click_left==0);
+        /* Volume scales the click; Move's first block after Play may trail beat zero. */
+        command(s,"{\"op\":\"metro\",\"enabled\":1,\"velocity\":50}");clock_status=MOVE_CLOCK_STATUS_RUNNING;beat=12.1;plugin->render_block(s,audio,64);
+        assert(s->metro_last==12 && s->metro_volume==50);
+        {int peak=0;for(int i=0;i<128;i++)if(abs(audio[i])>peak)peak=abs(audio[i]);assert(peak>0 && peak<=1400);}
+        {char info[256];s->count_state=2;s->count_pos=3.9;plugin->get_param(s,"clock",info,sizeof(info));assert(strstr(info,"\"count_pos\":3.900"));s->count_state=0;}
+        command(s,"{\"op\":\"metro\",\"enabled\":0}");clock_status=MOVE_CLOCK_STATUS_RUNNING;
+        command(s,"{\"op\":\"countin\",\"enabled\":0}");beat=20;plugin->render_block(s,audio,64);assert(s->click_left==0);
+        groups++;
+    }
+    /* Mid-beat arming waits for a beat boundary; stop/seek/cancel are silent. */
+    {
+        reset();Pilot *s=plugin->create_instance("",0);int16_t audio[256];clock_status=MOVE_CLOCK_STATUS_RUNNING;beat=10.25;
+        command(s,"{\"op\":\"countin\",\"enabled\":1}");tick(s,64);assert(s->count_start==12. && s->count_end==16.);
+        beat=12;plugin->render_block(s,audio,64);assert(s->count_step==0);
+        beat=3;tick(s,64);assert(s->count_state==4);
+        command(s,"{\"op\":\"countin\",\"enabled\":1}");beat=3.5;tick(s,64);
+        clock_status=MOVE_CLOCK_STATUS_STOPPED;tick(s,64);assert(s->count_state==4);
+        command(s,"{\"op\":\"countin\",\"enabled\":1}");command(s,"{\"op\":\"kill\"}");tick(s,64);assert(s->count_state==0);
+        command(s,"{\"op\":\"countin\",\"enabled\":1}");command(s,"{\"op\":\"record\",\"enabled\":0}");tick(s,64);assert(s->count_state==0);
+        groups++;
+    }
+    /* Per-part clip rates: quarter chord, eighth bass, half-note melody. */
+    {
+        reset();Pilot *s=plugin->create_instance("",0);clock_status=MOVE_CLOCK_STATUS_RUNNING;
+        command(s,"{\"op\":\"config\",\"bass_clip\":1}");
+        command(s,"{\"op\":\"cliplength\",\"index\":0,\"duration\":16,\"rate\":2}");
+        command(s,"{\"op\":\"cliplength\",\"index\":1,\"duration\":16,\"rate\":1}");
+        command(s,"{\"op\":\"cliplength\",\"index\":2,\"duration\":16,\"rate\":3}");
+        command(s,"{\"op\":\"slot\",\"index\":1,\"notes\":[60],\"duration\":1}");
+        command(s,"{\"op\":\"bassslot\",\"index\":1,\"notes\":[36],\"duration\":1}");
+        command(s,"{\"op\":\"melodyslot\",\"index\":1,\"notes\":[72],\"duration\":1}");
+        command(s,"{\"op\":\"arm\",\"enabled\":1}");beat=.5;tick(s,1);
+        assert(s->voices[LOOP_BASS_OWNER].count && !s->voices[LOOP_OWNER].count && !s->voices[MELODY_OWNER+1].count);
+        beat=1;tick(s,1);assert(s->voices[LOOP_OWNER].count && !s->voices[LOOP_BASS_OWNER].count);
+        beat=2;tick(s,1);assert(!s->voices[LOOP_OWNER].count && s->voices[MELODY_OWNER+1].count);
+        beat=4;tick(s,1);assert(!s->voices[MELODY_OWNER+1].count);
+        beat=8.5;tick(s,1);assert(s->voices[LOOP_BASS_OWNER].count && !s->voices[LOOP_OWNER].count);
+        command(s,"{\"op\":\"kill\"}");tick(s,1);assert(!s->voices[LOOP_BASS_OWNER].count);
+        plugin->destroy_instance(s);groups++;
+    }
+    /* Independent 32/16/64-cell loops, late events and safe wrap/launch. */
+    {
+        reset();Pilot *s=plugin->create_instance("",0);clock_status=MOVE_CLOCK_STATUS_RUNNING;
+        command(s,"{\"op\":\"cliplength\",\"index\":0,\"duration\":32}");assert(!s->error);
+        command(s,"{\"op\":\"cliplength\",\"index\":2,\"duration\":64}");assert(!s->error);
+        command(s,"{\"op\":\"cliplength\",\"index\":2,\"duration\":48}");assert(s->error && s->clip_length[2]==64);
+        command(s,"{\"op\":\"config\",\"bass_clip\":1}");
+        command(s,"{\"op\":\"slot\",\"index\":17,\"notes\":[60],\"at\":170000,\"len\":10000}");assert(!s->error);
+        command(s,"{\"op\":\"bassslot\",\"index\":1,\"notes\":[36],\"duration\":1}");
+        command(s,"{\"op\":\"melodyslot\",\"index\":63,\"notes\":[80],\"at\":630000,\"len\":20000}");assert(!s->error);
+        command(s,"{\"op\":\"arm\",\"enabled\":1}");beat=1;tick(s,1);
+        assert(s->voices[LOOP_BASS_OWNER].count && !s->voices[LOOP_OWNER].count);
+        beat=17;tick(s,1);assert(s->voices[LOOP_OWNER].count && s->voices[LOOP_BASS_OWNER].count);
+        beat=18;tick(s,1);assert(!s->voices[LOOP_OWNER].count && !s->voices[LOOP_BASS_OWNER].count);
+        beat=33;tick(s,1);assert(!s->voices[LOOP_OWNER].count && s->voices[LOOP_BASS_OWNER].count);
+        beat=49;tick(s,1);assert(s->voices[LOOP_OWNER].count);
+        beat=63;tick(s,1);assert(s->voices[MELODY_OWNER+63].count);
+        int ons=count(MOVE,1,80);beat=64;tick(s,1);assert(s->voices[MELODY_OWNER+63].count && count(MOVE,1,80)==ons);
+        beat=65;tick(s,1);assert(!s->voices[MELODY_OWNER+63].count);
+        command(s,"{\"op\":\"clipbegin\",\"index\":0}");
+        command(s,"{\"op\":\"clipend\",\"index\":0,\"origin\":65,\"duration\":64}");tick(s,1);
+        assert(s->clip_length[0]==64 && s->voices[LOOP_BASS_OWNER].count);
+        beat=82;tick(s,1);assert(s->voices[LOOP_OWNER].count);
+        clock_status=MOVE_CLOCK_STATUS_STOPPED;tick(s,1);
+        for(int i=0;i<OWNERS;i++)assert(!s->voices[i].count);
+        plugin->destroy_instance(s);groups++;
+    }
     test_pressure_routes_and_revoice();test_pressure_shared_pitch_and_hold();test_pressure_retries_validation_and_retrigger();
     /* Timed events hold across empty cells, retain velocity, and preempt cleanly. */
     {
@@ -1069,7 +1370,7 @@ int main(void) {
         command(s,"{\"op\":\"slot\",\"index\":1,\"notes\":[62],\"duration\":1}");
         beat=17.;tick(s,1);assert(s->event_slot==1 && s->voices[LOOP_OWNER].notes[0]==62);
         beat=18.;tick(s,1);assert(!s->voices[LOOP_OWNER].count); /* old event never resumes */
-        command(s,"{\"op\":\"slot\",\"index\":1,\"notes\":[62],\"duration\":17}");assert(s->error);
+        command(s,"{\"op\":\"slot\",\"index\":1,\"notes\":[62],\"duration\":65}");assert(s->error);
         plugin->destroy_instance(s);groups++;
     }
     /* Record monitoring silences sequence output, not live chords or live ARP. */
@@ -1084,6 +1385,110 @@ int main(void) {
         beat=1.;tick(s,1);assert(s->voices[0].count && s->voices[ARP_OWNER].notes[0]==72 && !s->voices[LOOP_OWNER].count);
         command(s,"{\"op\":\"record\",\"enabled\":0}");beat=16.;tick(s,1);assert(s->voices[LOOP_OWNER].notes[0]==60);
         command(s,"{\"op\":\"kill\"}");assert(!s->recording && !s->running);
+        plugin->destroy_instance(s);groups++;
+    }
+    /* Overdub keeps both lanes audible. Publishing a past onset on release
+     * cannot retrigger it; it is heard on the next lap, even with REC left on. */
+    for(int part=0;part<3;part++) {
+        reset();Pilot *s=plugin->create_instance("",0);clock_status=MOVE_CLOCK_STATUS_RUNNING;
+        command(s,"{\"op\":\"config\",\"bass_clip\":1}");
+        command(s,"{\"op\":\"slot\",\"index\":0,\"notes\":[60],\"duration\":4}");
+        command(s,"{\"op\":\"bassslot\",\"index\":0,\"notes\":[36],\"duration\":4}");
+        command(s,"{\"op\":\"arm\",\"enabled\":1}");beat=0;tick(s,1);
+        int ons=count(MOVE,1,60);char cmd[100];
+        snprintf(cmd,sizeof(cmd),"{\"op\":\"record\",\"enabled\":1,\"record_part\":%d,\"overdub\":1}",part);command(s,cmd);
+        assert(s->voices[LOOP_OWNER].count && s->voices[LOOP_BASS_OWNER].count);
+        beat=1;tick(s,1);assert(count(MOVE,1,60)==ons);
+        command(s,"{\"op\":\"slot\",\"index\":0,\"notes\":[62],\"at\":0,\"len\":40000}");
+        command(s,"{\"op\":\"bassslot\",\"index\":0,\"notes\":[38],\"at\":0,\"len\":40000}");
+        tick(s,1);assert(!count(MOVE,1,62) && !count(MOVE,1,38));
+        beat=16;tick(s,1);assert(s->voices[LOOP_OWNER].notes[0]==62 && s->voices[LOOP_BASS_OWNER].notes[0]==38);
+        assert(s->overdub);command(s,"{\"op\":\"record\",\"enabled\":0,\"overdub\":1}");
+        tick(s,1);assert(count(MOVE,1,62)==1);
+        beat=0;tick(s,1);assert(s->voices[LOOP_OWNER].count); /* restart */
+        command(s,"{\"op\":\"kill\"}");assert(!s->overdub && !s->running);
+        plugin->destroy_instance(s);
+    }
+    groups++;
+    /* A sequenced note on a pitch that is still sounding (overlap or a repeat
+     * that abuts) strikes again; it is a new attack, not a silent extra ref. */
+    for(int len=10000;len<=12000;len+=2000) {
+        reset();Pilot *s=plugin->create_instance("",0);char cmd[128];clock_status=MOVE_CLOCK_STATUS_RUNNING;
+        command(s,"{\"op\":\"melodyconfig\",\"route\":0,\"channel\":7}");
+        snprintf(cmd,sizeof(cmd),"{\"op\":\"melodyslot\",\"index\":0,\"notes\":[72],\"at\":0,\"len\":%d}",len);command(s,cmd);
+        command(s,"{\"op\":\"melodyslot\",\"index\":1,\"notes\":[72],\"at\":10000,\"len\":10000}");
+        command(s,"{\"op\":\"bassslot\",\"index\":0,\"notes\":[36],\"at\":0,\"len\":10000}");
+        command(s,"{\"op\":\"bassslot\",\"index\":1,\"notes\":[36],\"at\":10000,\"len\":10000}");
+        command(s,"{\"op\":\"config\",\"bass_clip\":1}");
+        command(s,"{\"op\":\"arm\",\"enabled\":1}");beat=0;tick(s,1);beat=.5;tick(s,1);
+        assert(count(MOVE,1,72)==1 && count(MOVE,1,36)==1);
+        beat=1.05;tick(s,1);tick(s,1);
+        assert(count(MOVE,1,72)==2);assert(count(MOVE,1,36)==2);
+        beat=2.5;tick(s,1);assert(count(MOVE,0,72)>=count(MOVE,1,72)-0);
+        plugin->destroy_instance(s);
+    }
+    groups++;
+    /* The same chord on consecutive steps, untimed or recorded, strikes again,
+     * and so does its automatic bass. */
+    for(int timed=0;timed<2;timed++) {
+        reset();Pilot *s=plugin->create_instance("",0);clock_status=MOVE_CLOCK_STATUS_RUNNING;
+        command(s,"{\"op\":\"config\",\"bass\":1}");
+        if(timed){command(s,"{\"op\":\"slot\",\"index\":0,\"notes\":[60,64,67],\"bass\":48,\"duration\":1,\"at\":0,\"len\":10000}");
+                  command(s,"{\"op\":\"slot\",\"index\":1,\"notes\":[60,64,67],\"bass\":48,\"duration\":1,\"at\":10000,\"len\":10000}");}
+        else {command(s,"{\"op\":\"slot\",\"index\":0,\"notes\":[60,64,67],\"bass\":48,\"duration\":1}");
+              command(s,"{\"op\":\"slot\",\"index\":1,\"notes\":[60,64,67],\"bass\":48,\"duration\":1}");}
+        command(s,"{\"op\":\"arm\",\"enabled\":1}");beat=0;tick(s,1);beat=.5;tick(s,1);
+        assert(count(MOVE,1,60)==1);
+        beat=1.02;tick(s,1);tick(s,1);
+        assert(count(MOVE,1,60)==2);assert(count(-1,1,48)==2);
+        plugin->destroy_instance(s);
+    }
+    groups++;
+    /* Polyphonic melody lane: independent releases, fixed pitches, routing,
+     * loop wrap, overdub deferral and transport/STOP cleanup. */
+    for(int route=0;route<4;route++) {
+        reset();Pilot *s=plugin->create_instance("",0);char cmd[128];clock_status=MOVE_CLOCK_STATUS_RUNNING;
+        snprintf(cmd,sizeof(cmd),"{\"op\":\"melodyconfig\",\"route\":%d,\"channel\":7}",route);command(s,cmd);assert(!s->error);
+        command(s,"{\"op\":\"melodyslot\",\"index\":0,\"notes\":[72],\"at\":0,\"len\":20000,\"velocity\":71}");
+        command(s,"{\"op\":\"melodyslot\",\"index\":16,\"notes\":[76],\"at\":5000,\"len\":5000,\"velocity\":92}");
+        command(s,"{\"op\":\"arm\",\"enabled\":1}");beat=0;tick(s,1);
+        assert(s->voices[MELODY_OWNER].notes[0]==72 && s->voices[MELODY_OWNER].channel==7);
+        beat=.5;tick(s,1);assert(s->voices[MELODY_OWNER].count && s->voices[MELODY_OWNER+16].count);
+        beat=1;tick(s,1);assert(s->voices[MELODY_OWNER].count && !s->voices[MELODY_OWNER+16].count);
+        beat=2;tick(s,1);assert(!s->voices[MELODY_OWNER].count);
+        command(s,"{\"op\":\"record\",\"enabled\":1,\"overdub\":1}");
+        command(s,"{\"op\":\"melodyslot\",\"index\":0,\"notes\":[74],\"at\":0,\"len\":30000}");tick(s,1);
+        assert(!s->voices[MELODY_OWNER].count);beat=16;tick(s,1);assert(s->voices[MELODY_OWNER].notes[0]==74);
+        command(s,"{\"op\":\"slot\",\"index\":0,\"notes\":[60,64,67],\"duration\":4}");
+        assert(s->voices[MELODY_OWNER].notes[0]==74);
+        clock_status=MOVE_CLOCK_STATUS_STOPPED;tick(s,1);assert(!s->voices[MELODY_OWNER].count);
+        clock_status=MOVE_CLOCK_STATUS_RUNNING;beat=0;tick(s,1);assert(s->voices[MELODY_OWNER].count);
+        command(s,"{\"op\":\"kill\"}");tick(s,1);assert(!s->voices[MELODY_OWNER].count);
+        command(s,"{\"op\":\"cleargrid\"}");assert(!s->melody_slots[0].count);
+        plugin->destroy_instance(s);
+    }
+    groups++;
+    /* Clip upload mutes only its lane; launch origin restarts that clip at
+     * step 1 on host beat 4 while the other lanes continue their old phase. */
+    {
+        reset();Pilot *s=plugin->create_instance("",0);clock_status=MOVE_CLOCK_STATUS_RUNNING;
+        command(s,"{\"op\":\"config\",\"bass_clip\":1}");
+        command(s,"{\"op\":\"slot\",\"index\":0,\"notes\":[60],\"duration\":8}");
+        command(s,"{\"op\":\"bassslot\",\"index\":0,\"notes\":[36],\"duration\":8}");
+        command(s,"{\"op\":\"arm\",\"enabled\":1}");beat=0;tick(s,1);beat=4;tick(s,1);
+        int chord_ons=count(MOVE,1,60),bass_ons=count(MOVE,1,36);
+        command(s,"{\"op\":\"clipbegin\",\"index\":2}");
+        command(s,"{\"op\":\"melodyslot\",\"index\":0,\"notes\":[72],\"duration\":2}");tick(s,1);
+        assert(!s->voices[MELODY_OWNER].count);
+        command(s,"{\"op\":\"clipend\",\"index\":2,\"origin\":4}");tick(s,1);
+        assert(s->voices[MELODY_OWNER].notes[0]==72);
+        assert(count(MOVE,1,60)==chord_ons && count(MOVE,1,36)==bass_ons);
+        beat=6;tick(s,1);assert(!s->voices[MELODY_OWNER].count);
+        command(s,"{\"op\":\"clipbegin\",\"index\":0}");
+        command(s,"{\"op\":\"slot\",\"index\":0,\"notes\":[65],\"duration\":2}");tick(s,1);assert(!s->voices[LOOP_OWNER].count);
+        command(s,"{\"op\":\"clipend\",\"index\":0,\"origin\":6}");tick(s,1);
+        assert(s->voices[LOOP_OWNER].notes[0]==65 && s->slot==0);assert(s->voices[LOOP_BASS_OWNER].notes[0]==36);
+        command(s,"{\"op\":\"kill\"}");assert(!s->clip_loading && s->clip_origin[0]==0);
         plugin->destroy_instance(s);groups++;
     }
     /* Clock reads are fresh host timestamps, including before UI polls. */
@@ -1219,6 +1624,9 @@ int main(void) {
         command(s,"{\"op\":\"kill\"}");assert(!s->voices[LOOP_OWNER].count);
         plugin->destroy_instance(s);groups++;
     }
+    test_stable_ensemble_core();test_stable_ensemble_delivery();test_stable_ensemble_maps_and_retry();
+    test_expression_cc_delivery();test_expression_cc_retry_shared_and_stop();
+    test_stable_ensemble_isolation_and_pedal();
     test_divisi_routes_and_release();test_divisi_revoice_and_shared_pressure();
     test_ensemble_custom_channels();test_ensemble_pedal_remap_and_shared_channels();test_ensemble_validation_loop_and_retry();
     test_divisi_strum_retry_and_boundaries();test_divisi_pedal_and_sequence();
@@ -1232,8 +1640,8 @@ int main(void) {
     test_arp_shared_pitch_and_failed_release();
     test_arp_clock_gate_directions_range();test_arp_hold_swing_seek_kill_and_routing();test_arp_follows_loop_independent_gate_and_rests();
     test_shared_ownership(); test_routes_and_reconfiguration(); test_failed_delivery();
-    test_strum_and_panic(); test_loop_transport_gate(); test_loop_rests_rates_clock();
-    test_shared_loop_live(); test_validation_echo_testnote(); test_lifecycle_capabilities();
+    test_strum_and_panic(); test_selected_page_start();test_loop_transport_gate(); test_loop_rests_rates_clock();
+    test_shared_loop_live(); test_validation_echo_testnote(); test_lifecycle_capabilities(); test_unload_teardown_is_silent();
     test_legato_revoice_and_release(); test_legato_loop_ties_rests_and_updates();
     test_legato_failed_off_never_loses_reference();
     test_melody_retrigger_shared_pitch(); test_retrigger_channel_isolation_and_failure();

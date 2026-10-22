@@ -11,12 +11,12 @@ function setup(settings={}) {
   p.init();
   const settle=()=>{for(let i=0;i<100;i++)p.tick();};
   const model=()=>p.inspect().model;
-  const expected=()=>`${model().chordLabel} | ${model().degreeLabel}`;
+  const expected=()=>`C Major | ${model().degreeLabel}`;
   return {p,commands,settle,model,expected};
 }
-test('Lab PLAY retains chord and function after release and notice timeout',()=>{
+test('Lab PLAY retains key and function after release and notice timeout',()=>{
   const h=setup();h.p.pad(C[3],true);h.p.pad(C[3],false);h.settle();
-  assert.match(h.model().detail,/^F \|/);assert.equal(h.model().detail,h.expected());
+  assert.equal(h.model().chordLabel,'F');assert.equal(h.model().detail,'C Major | IV');assert.equal(h.model().detail,h.expected());
   const text=[];renderScreen({clear(){},line(){},rect(){},fill(){},text(x,y,t){if(y===55)text.push(t);}},h.model());
   assert.equal(text[0],h.expected());
 });
@@ -24,9 +24,9 @@ test('Lab bass gesture footer follows slash bass immediately, without MIDI from 
   for(const sustain of ['off','hold','pedal']) {
     const h=setup({bassEnabled:true,bassGesture:true,chordSustain:sustain,bassSustain:sustain});
     h.p.pad(C[0],true);h.p.pad(C[2],true);
-    assert.match(h.model().detail,/^C\/E \|/);assert.equal(h.model().detail,h.expected());
-    h.p.pad(C[0],false);assert.match(h.model().detail,/^C\/E \|/);
-    h.p.pad(C[0],true);assert.match(h.model().detail,/^C \|/);
+    assert.match(h.model().chordLabel,/^C\/E$/);assert.equal(h.model().detail,h.expected());
+    h.p.pad(C[0],false);assert.match(h.model().chordLabel,/^C\/E$/);
+    h.p.pad(C[0],true);assert.equal(h.model().chordLabel,'C');
     h.p.pad(C[2],false);h.p.pad(C[0],false);h.settle();
     assert.equal(h.model().detail,h.expected());
     const count=h.commands.length;for(let n=0;n<10;n++)h.p.repaint(true);

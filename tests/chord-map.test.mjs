@@ -20,7 +20,7 @@ test('PLAY maps eight chords in physical order, with one marker per main page',(
   renderScreen({clear(){},text(x,y,t){if(y===18||y===40)texts.push([x,y,t]);},
     line(x,y,x2,y2){if(y===6&&y2===6)marks.push(x);},rect(){},fill(x,y,w,height){if(y===2&&height===5)marks.push(x);}},h.pilot.inspect().model);
   assert.deepEqual(texts.map(x=>x[2]),['G','Am','Bdim','C','C','Dm','Em','F']);
-  assert.equal(marks.length,PAGES.length);
+  assert.equal(marks.length,6);
   assert.ok(marks.every(x=>x>=45&&x<64));
 });
 
@@ -46,10 +46,10 @@ test('all modifier previews and combinations match actual attacks without previe
 
 test('BORROW latch previews survive release, and unlocking restores normal labels',()=>{
   const h=setup(),normal=h.map().items.map(x=>x.label);
-  h.pilot.pad(94,true,100,{shift:true});h.pilot.pad(94,false);
+  h.pilot.pad(94,true);h.pilot.mainButton(true);h.pilot.mainButton(false);h.pilot.pad(94,false);
   assert.notDeepEqual(h.map().items.map(x=>x.label),normal);
   assert.match(h.pilot.inspect().model.detail,/BORROW LOCK/);
-  h.pilot.pad(94,true,100,{shift:true});h.pilot.pad(94,false);
+  h.pilot.pad(94,true);h.pilot.mainButton(true);h.pilot.mainButton(false);h.pilot.pad(94,false);
   assert.deepEqual(h.map().items.map(x=>x.label),normal);
 });
 

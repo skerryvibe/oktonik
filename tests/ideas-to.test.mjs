@@ -58,7 +58,7 @@ test('TO uses per-pad edits and BORROW exactly once and leaving IDEAS restores t
   assert.equal(chordType(expected),'MIN');assert.equal(expected.rootOffset,2);assert.ok(expected.intervals.includes(11));
   h.page('IDEAS');h.turn('ideasEnabled',1);
   assert.equal(sig(h.p.inspect().ideas[2].chord),sig(expected));
-  h.p.pad(94,true,100,{shift:true});h.p.pad(94,false);
+  h.p.pad(94,true);h.p.mainButton(true);h.p.mainButton(false);h.p.pad(94,false);
   const targetIndex=h.p.inspect().ideas.findIndex(r=>r.family==='target');
   // Lock changes the suggestion context, never the captured literal target.
   assert.equal(sig(h.p.inspect().ideas[targetIndex].chord),sig(expected));
@@ -78,7 +78,7 @@ test('old projects default to NEXT and target 1; malformed target values are bou
 });
 test('enabling TO captures the actual borrowed played chord, not its original pad or a second borrow',()=>{
   const h=setup(encodeDocument({ideasMode:'to',ideasTarget:7},[]));
-  h.p.pad(94,true,100,{shift:true});h.p.pad(94,false);
+  h.p.pad(94,true);h.p.mainButton(true);h.p.mainButton(false);h.p.pad(94,false);
   h.p.pad(C[3],true);h.p.pad(C[3],false);
   assert.equal(chordName(h.p.inspect().active.chord),'Fm');
   h.page('IDEAS');const n=h.commands.length;h.turn('ideasEnabled',1);

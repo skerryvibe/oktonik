@@ -1,4 +1,45 @@
 import { SCALES, buildChordBank, applyModifiers, chordNotes, chordName, chordType, degreeName, normalizeHarmony, borrowedScaleId } from './theory.mjs';
+import {CHORD_RECIPES} from './chord-library.mjs';
+
+// Replacements, not approaches: a stable original followed by same-root
+// colours; WILD additionally permits parallel quality and common-tone roots.
+// Bounded pure query, independent of physical pads and MIDI ownership.
+export function generateIdeasAlt(source,input={}, {color='MIX',borrow=false,bank}={}) {
+  const context=ideasContext(input,borrow);
+  const anchor=source||(bank||buildChordBank(context))[0];
+  const scale=SCALES.find(s=>s.id===context.scaleId).intervals;
+  const original=pcs(anchor),allowed=new Set([...scale,...original]);
+  const entries=[],seen=new Set();
+  function add(raw,reason,family,originalEntry=false) {
+    const {snapshot,targetOffset,targetIntervals,...base}=raw;
+    const chord={...base,intervals:[...raw.intervals]};
+    const key=signature(chord);if(seen.has(key))return;
+    const tones=pcs(chord);
+    if(!originalEntry && color==='IN' && (chord.intervals.length>4 || tones.some(n=>!allowed.has(n))))return;
+    if(!chordNotes(chord,input).length)return;
+    seen.add(key);entries.push({chord,reason,family,outside:tones.some(n=>!scale.includes(n))});
+  }
+  add(anchor,'ORIGINAL','original',true);
+  const tones=anchor.intervals.map(pc),type=chordType(anchor);
+  const dominant=tones.includes(4)&&tones.includes(10);
+  const recipes=type==='MIN'?['MIN','m7','m9','m69','m11']:
+    type==='DIM'?['DIM','h7','o7']:
+    type==='SUS2'||type==='SUS4'?['SUS2','SUS4','7sus','9sus','5']:
+    type==='MAJ'?dominant?['D7','D9','D13','7sus','9sus','7b9','7#9','7#11','7b13']:
+      ['MAJ','M7','6/9','M9','M#11']:[];
+  for(const recipe of recipes) {
+    if(color!=='OUT' && ['7b9','7#9','7#11','7b13'].includes(recipe))continue;
+    add({...anchor,source:'custom',intervals:CHORD_RECIPES[recipe]},'SAME ROOT | '+recipe,'colour');
+  }
+  if(color==='OUT') {
+    if(type==='MAJ'||type==='MIN')add(applyModifiers(anchor,{flip:true},context),'PARALLEL QUALITY','parallel');
+    const candidates=(bank||buildChordBank(context)).filter(c=>pc(c.rootOffset)!==pc(anchor.rootOffset))
+      .map(chord=>({chord,shared:pcs(chord).filter(n=>original.includes(n)).length}))
+      .filter(c=>c.shared>=2).sort((a,b)=>b.shared-a.shared||a.chord.rootOffset-b.chord.rootOffset);
+    for(const {chord,shared} of candidates)add(chord,shared+' COMMON TONES','common');
+  }
+  return entries.slice(0,8);
+}
 
 export const IDEA_COLORS = Object.freeze(['IN', 'MIX', 'OUT']);
 // Retain stored IDs so existing projects and frozen steps need no migration.
@@ -41,7 +82,7 @@ export function generateIdeas(source, input = {}, { color = 'MIX', borrow = fals
   const settings = normalizeHarmony(input), context = ideasContext(input, borrow);
   const scale = SCALES.find(s => s.id === context.scaleId);
   const scalePcs = new Set(scale.intervals);
-  const base = (bank || buildChordBank(settings)).map(chord => borrow ? applyModifiers(chord, { borrow: true }, settings) : chord);
+  const base = (bank || buildChordBank(input)).map(chord => borrow ? applyModifiers(chord, { borrow: true }, settings) : chord);
   const anchor = source || base[0];
   const pool = new Map();
   function add(raw, reason, family, priority = 0) {
@@ -51,6 +92,7 @@ export function generateIdeas(source, input = {}, { color = 'MIX', borrow = fals
     if(color==='IN'&&(chord.intervals.length>4||Math.max(...chord.intervals)>11))return;
     if(color==='MIX'&&(chord.intervals.length>5||Math.max(...chord.intervals)>14))return;
     const tones = pcs(chord), outside = tones.filter(n => !scalePcs.has(n)).length;
+    if(outside)reason=reason.replace('IN SCALE','COLOR');
     const key = signature(chord);
     if (pool.has(key)) return;
     const relation=ideaRelationship(anchor,chord);
@@ -62,16 +104,16 @@ export function generateIdeas(source, input = {}, { color = 'MIX', borrow = fals
       pool.set(key, { chord, reason: relation.target ? 'RESOLVE -> '+chordName(chord,input)
         : reason, family, outside, score, key, label: chordName(chord, input) });
   }
-  base.forEach(c => add(c, degreeName(c, context) + ' | IN SCALE', 'scale', 8));
+  base.forEach(c => add(c, degreeName(c, context) + (pcs(c).every(n=>scalePcs.has(n))?' | IN SCALE':' | COLOR'), 'scale', 8));
   // Additional in-scale shapes make eight distinct ideas possible even in
   // pentatonic modes, without filling a bank with octave copies of one chord.
   for (const extension of [0,1,2,3,4,5,6]) {
-    buildChordBank({ ...context, extension, inversion: 0 }).slice(0,scale.intervals.length)
+    buildChordBank({ ...context, extensionProfile:'global', extension, inversion: 0 }).slice(0,scale.intervals.length)
       .forEach(c => add(c, degreeName(c, context) + ' | IN SCALE', 'scale'));
   }
   // Sparse scales need simple alternatives, not dense extensions, to fill
   // eight distinct choices. The normal scale filter still applies below.
-  if(scale.intervals.length<7)for(const simple of buildChordBank({...context,extension:0}))
+  if(scale.intervals.length<7)for(const simple of buildChordBank({...context,extensionProfile:'global',extension:0}))
     for(const variant of [{},{sus:2},{sus:4},{flip:true}])
       add(applyModifiers(simple,variant,context),'SIMPLE | IN SCALE','simple');
   base.forEach(target => {
@@ -83,6 +125,8 @@ export function generateIdeas(source, input = {}, { color = 'MIX', borrow = fals
     for (const [modifier, name] of [['dom','V'], ['sub','SUB'], ['ii','II']]) {
       add(applyModifiers(target, { [modifier]: true }, context), name + ' -> ' + chordName(target,input), modifier);
     }
+    if(color!=='IN')for(const [approach,name] of [['dimTo','VIIo7'],['backdoor','bVII7'],['minorIV','iv7'],['commonDim','CT DIM']])
+      add(applyModifiers(target,{approach},context),name+' -> '+chordName(target,input),approach);
   });
   const rank = rows => rows.sort((a,b) => b.score-a.score || a.key.localeCompare(b.key));
   const inside = rank([...pool.values()].filter(c => !c.outside));
@@ -120,6 +164,8 @@ export function generateIdeasTo(source, target, input = {}, {color='MIX',borrow=
   }
   add(target,'TARGET '+name,'target');
   if(tonal&&color!=='IN')add(applyModifiers(target,{sub:true},context),'SUB -> '+name,'sub');
+  if(tonal&&color!=='IN')for(const [approach,label] of [['minorIV','iv7'],['backdoor','bVII7'],['dimTo','VIIo7']])
+    add(applyModifiers(target,{approach},context),label+' -> '+name,approach);
   const pool=new Map();
   for(const anchor of [source||target,target])for(const style of ['IN','MIX','OUT'])
     for(const row of generateIdeas(anchor,input,{color:style,borrow,bank})) {

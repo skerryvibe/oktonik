@@ -48,7 +48,8 @@ test('multiple bass targets use last-press priority; steps capture the transient
   h.pilot.step(15,true,{shift:true}); assert.equal(h.pilot.inspect().progression[15].snapshot.bass,33);
   assert.equal(h.pilot.inspect().overrides[0],null);
   h.up(6); assert.equal(h.bass(),33); h.up(0);
-  h.pilot.step(15,true); assert.equal(h.bass(),33);
+  h.pilot.step(15,true); assert.equal(h.bass(),undefined);
+  assert.equal(h.pilot.inspect().progression[15].snapshot.bass,33);
   assert.equal(h.pilot.inspect().model.chordLabel,'C/A');
 });
 

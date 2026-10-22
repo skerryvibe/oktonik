@@ -28,7 +28,7 @@ function renderHeader(draw, model) {
   const pageIndex = Number.isFinite(model.pageIndex) ? Math.max(0, model.pageIndex) : 0;
   const pageCount = Math.min(11, Math.max(1, Number(model.pageCount) || 1));
   const title=model.extraLayer ? ({'ENSEMBL':'ENS.CH+','A.CLOCK':'A.CLK+','M.EXTRA':'M.EXTR+','B.EXTRA':'B.EXTR+'}[model.pageName] || model.pageName+'+') : model.pageName;
-  draw.text(1, 0, fit(title === 'ARP MIDI' ? 'A.MIDI' : title || 'HARMONY', 7), 1);
+  draw.text(1, 0, fit(({'ARP MIDI':'A.MIDI','MOD PADS':'MODPAD','EXT PROF':'EXT.PRF'}[title] || title) || 'HARMONY', 7), 1);
   // One mark per page: the selected tab is tall, the others are underlines.
   const step = model.borrowLocked ? (pageCount <= 6 ? 2 : 1) : pageCount > 10 ? 1 : pageCount > 6 ? 2 : pageCount > 4 ? 3 : 5;
   const width = model.borrowLocked ? 1 : pageCount > 6 ? 1 : pageCount > 4 ? 2 : 3;
@@ -42,7 +42,7 @@ function renderHeader(draw, model) {
     if (index === pageIndex) draw.fill(x, 2, width, 5, 1);
     else draw.line(x, 6, x + width - 1, 6, 1);
   }
-  draw.text(65, 0, fit(model.chordLabel || '--', 10), 1);
+  draw.text(65, 0, fit(model.recordCount || (model.recordTarget?'REC '+({melody:'MEL',chord:'CHRD',both:'C+B'}[model.recordTarget]||model.recordTarget.toUpperCase()):model.chordLabel || '--'), 10), 1);
   draw.line(0, 9, 127, 9, 1);
 }
 
@@ -146,7 +146,21 @@ function renderChordMap(draw, model, map) {
 export function renderScreen(draw, model = {}) {
   draw.clear();
   renderHeader(draw, model);
-  if (model.chordMap || model.ideaView) renderChordMap(draw, model, model.chordMap || model.ideaView);
+  if (model.clipGrid) {
+    model.clipGrid.forEach((row,r)=>{
+      const y=12+r*14;
+      draw.text(1,y,['C','B','M'][r],1);
+      row.items.forEach((c,i)=>{
+        const x=14+i*14;
+        if(c.selected)draw.rect(x-1,y-1,12,12,1);
+        draw.text(x,y,c.data?String(i+1):'-',1);
+        if(c.pending)draw.line(x,y+9,x+7,y+9,1);
+        if(c.editing)draw.fill(x+8,y+2,2,2,1);
+      });
+    });
+    footer(draw,model.detail);
+  }
+  else if (model.chordMap || model.ideaView) renderChordMap(draw, model, model.chordMap || model.ideaView);
   else if (model.theory) renderTheory(draw, model);
   else renderCells(draw, model);
 }

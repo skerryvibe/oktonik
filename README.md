@@ -7,26 +7,29 @@ Play chords, melody and bass together on Ableton Move through Schwung.
 Explore harmony with your left hand, play melodies with your right, and route
 each part to a different instrument. OKTONIK generates MIDI, not audio.
 
-## OKTONIK 0.1.0
+## OKTONIK 0.2.0
 
-Co-run chain editing, persistent PLAY harmony feedback, signed inversions,
-simple STRUM and opt-in melody poly aftertouch on MELODY knob 6.
- [Installation notes](docs/install-public.md).
+0.2.0 adds clips and recording to the live instrument of 0.1.0.
 
-- Five pages: PLAY, CHORD, MELODY, BASS and MIDI.
-- Live Chord Map, harmonic modifiers and per-pad chord editing.
-- Adaptive melody, Bass Gesture, independent sustain and MIDI routing.
-- STRUM on CHORD.
-- CHORD controls directly on PLAY, with parameter/value feedback.
-- Longer Chord Map names use two lines without shrinking the text.
-- Focused on live playing.
+- Eight clips each for chords, bass and melody, with their own length, rate
+  and quantize. Record live, overdub while Move plays, undo and mute parts.
+- Step sequencing as on Move: hold a step for length, arrows to nudge, Copy +
+  step, Loop + step for clip length. Shift + step shortcuts in Move's layout.
+- Count-in and metronome, twelve extension profiles, editable modifier pads,
+  PENTA/BLUES melody palettes, right-hand bass pads and a strum menu.
+- Voicing: CLOSE, OPEN or WIDE spread, with LEAD OFF, CNTR or FREE.
+- Co-run: Shift + Track opens a Schwung chain while OKTONIK keeps playing.
+- Focused on live playing; tempo follows Move.
+
+See the [release notes](docs/release-notes-0.2.0.md) and the
+[installation notes](docs/install-public.md).
 
 **[Illustrated user guide](docs/oktonik-public.md)** ·
 **[Report a problem](https://github.com/skerryvibe/oktonik/issues)**
 
 ![Chords and modifiers on the left; sixteen melody pads on the right](docs/images/pad-layout.svg)
 
-Requires Ableton Move, **Schwung 1.6.2 or newer**, and a receiving instrument.
+Requires Ableton Move, **Schwung 1.6.2 or newer** (0.2.0 was tested with 1.7.3), and a receiving instrument.
 Shift + Track 1-4 opens a Schwung chain while OKTONIK pads keep playing.
 Back returns through the chain views to OKTONIK. This is a Tool, not a MIDI FX.
 
@@ -43,7 +46,8 @@ project only if its own file is absent. Original files remain untouched. There
 is no ongoing synchronization. Keep the old installation until imports are tested.
 
 See [the illustrated user guide](docs/oktonik-public.md) for a first jam,
-modifier examples, Bass Gesture, melody, sustain and MIDI routing.
+modifier examples, Bass Gesture, melody, recording, clips, steps, Shift + step
+shortcuts, sustain and MIDI routing.
 
 ## Help shape the instrument
 
