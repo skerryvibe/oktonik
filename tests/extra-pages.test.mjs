@@ -53,9 +53,9 @@ test('melody and bass extras have one parameter home and retain normal-page knob
   p.shift(true);assert.equal(p.inspect().model.cells[0].id,'melodyFollow');
   assert.equal(p.inspect().model.cells[2].id,'melodyExpressionMin');
   navigate(p,'BASS');p.knob(0,1);assert.equal(p.inspect().model.cells[7].id,'bassSustain');
-  p.shift(true);assert.deepEqual(p.inspect().model.cells.slice(0,3).map(c=>c.id),['bassVelocityMode','bassVelocity','bassPlayback']);
-  p.knob(0,1);p.knob(1,-10);const velocity=p.inspect().settings.bassVelocity;
+  assert.equal(p.inspect().model.cells[6].id,'bassPads');
+  p.shift(true);assert.deepEqual(p.inspect().model.cells.slice(0,4).map(c=>c.id),['smartBass',undefined,'bassExpressionMin','bassExpressionMax']);
   p.shift(false);p.pad(C[0],true,20);
-  assert.equal(commands.findLast(c=>c.op==='on'&&c.owner===40).velocity,velocity);
+  assert.equal(commands.findLast(c=>c.op==='on'&&c.owner===40).velocity,20);
   assert.equal(p.inspect().model.pageName,'BASS');
 });

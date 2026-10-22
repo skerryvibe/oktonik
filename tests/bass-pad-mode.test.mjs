@@ -25,12 +25,12 @@ for(const profile of ['public','lab'])test(`${profile}: bass right pads are mono
  assert.ok(!h.commands.slice(n).some(c=>c.op==='on'));assert.equal(p.inspect().voices.length,0);
 });
 for(const profile of ['public','lab'])test(`${profile}: switch is safe, persists, uses bass sustain and is shared by both pages`,()=>{
- const h=setup({bassSustain:'hold'},profile),{p}=h;p.track(1);p.knob(2,1);assert.equal(p.inspect().settings.bassPads,true);
- p.pad(M[0],true);p.knob(2,-1);assert.equal(p.inspect().settings.bassPads,true);
+ const h=setup({bassSustain:'hold'},profile),{p}=h;p.track(1);p.knob(6,1);assert.equal(p.inspect().settings.bassPads,true);
+ p.pad(M[0],true);p.knob(6,-1);assert.equal(p.inspect().settings.bassPads,true);
  p.pad(M[0],false);assert.equal(p.inspect().voices[0][1].sustained,true);
- p.track(2);assert.equal(p.inspect().model.cells[3].id,'bassPads');assert.equal(p.inspect().model.cells[3].value,'BASS');
- p.knob(3,-1);assert.equal(p.inspect().voices.length,0);
- p.track(1);assert.equal(p.inspect().model.cells[2].value,'MEL');p.knob(2,1);p.unload();
+ p.track(2);assert.equal(p.inspect().model.cells[6].id,'bassPads');assert.equal(p.inspect().model.cells[6].value,'BASS');
+ p.knob(6,-1);assert.equal(p.inspect().voices.length,0);
+ p.track(1);assert.equal(p.inspect().model.cells[6].value,'MEL');p.knob(6,1);p.unload();
  assert.equal(JSON.parse(h.saved()).settings.bassPads,true);assert.equal(normalizeSettings({}).bassPads,false);
  const restored=setup(JSON.parse(h.saved()).settings,profile);restored.p.pad(M[0],true);assert.equal(restored.commands.findLast(c=>c.op==='on').owner,40);
 });
@@ -51,8 +51,8 @@ test('Public bass surface uses bass output, does not send melody AT, and refuses
  p.track(1);p.pad(C[0],true);assert.ok(h.commands.some(c=>c.op==='on'&&c.owner===0));
  p.pad(M[0],true,83);const on=h.commands.findLast(c=>c.op==='on');assert.equal(on.owner,40);assert.equal(on.channel,5);assert.equal(on.velocity,83);
  const n=h.commands.length;p.pressure(0,127);p.tick();assert.ok(!h.commands.slice(n).some(c=>['pressure','express'].includes(c.op)));
- p.pad(M[0],false);p.pad(C[0],false);p.record();p.knob(2,-1);assert.equal(p.inspect().settings.bassPads,true);
- p.record();p.knob(2,-1);p.pad(M[0],true);assert.equal(h.commands.findLast(c=>c.op==='on').owner,8);
+ p.pad(M[0],false);p.pad(C[0],false);p.record();p.knob(6,-1);assert.equal(p.inspect().settings.bassPads,true);
+ p.record();p.knob(6,-1);p.pad(M[0],true);assert.equal(h.commands.findLast(c=>c.op==='on').owner,8);
 });
 test('Play starts at selected page and rate, resets on stop, and browsing while playing is silent',()=>{
  const h=setup(),{p}=h;p.changePage(PAGES.indexOf('SEQ'));p.knob(2,1);p.pageSteps(1);p.play();

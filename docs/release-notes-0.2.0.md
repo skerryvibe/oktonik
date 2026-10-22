@@ -8,7 +8,8 @@ Move projects before updating. Tested with Schwung 1.7.3.
 ## New since 0.1.0
 
 - **Clips for chords, bass and melody:** eight clips per part in the clip view
-  (Menu), each with its own length (16/32/64 steps), rate and quantize.
+  (Menu), each with its own length (16/32/64 steps), rate and quantize. A bass
+  clip with notes plays its own line; an empty one follows the chord clip.
 - **Recording:** the Sample button arms recording. PLAY records every part,
   Track 2 bass, Track 3 melody and Track 1 what SETUP C.REC says. Pressed while
   Move plays, recording starts at once (overdub). Undo restores the previous
@@ -23,7 +24,8 @@ Move projects before updating. Tested with Schwung 1.7.3.
 - **Harmony:** editable modifier pads, twelve extension profiles from POP to
   AMB, PENTA/BLUES melody palettes with adaptive SCALE TARGET.
 - **Voicing:** CLOSE, OPEN or WIDE spread; LEAD OFF, CNTR or FREE.
-- **Right-hand bass:** R.PAD switches all sixteen right-hand pads to bass.
+- **Right-hand bass:** R.PAD (knob 7 on BASS or MELODY) switches all sixteen
+  right-hand pads to bass.
 - **Strum menu:** gap, direction, timing and velocity variation.
 - **Co-run:** Shift + Track opens a Schwung chain while OKTONIK keeps playing.
 - The illustrated guide comes with the package as **GUIDE.html**.
@@ -39,6 +41,8 @@ Move projects before updating. Tested with Schwung 1.7.3.
   the new chord. MELODY's TRACK control is gone.
 - LEAD has OFF / CNTR / FREE instead of LEAD ON/OFF plus REG. WIDE sounds
   narrower and clearer than in 0.1.0.
+- Bass always follows how hard you play; the fixed bass velocity (VEL/B.VEL)
+  is gone. Shift + step 10 plays everything at 127.
 - To lock BORROW, hold its pad and press the main encoder (was Shift + BORROW).
   Shift + modifier pad now edits that pad's function.
 - The step buttons, Loop, Copy, Delete and Sample are now used by OKTONIK.

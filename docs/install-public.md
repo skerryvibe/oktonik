@@ -22,7 +22,7 @@ PLAY shows the chord map. Its knobs match CHORD:
 Touch/turn a knob to see its value. OCT is knob 2 and SUST knob 8 on each part.
 
 - Main encoder: PLAY, EXT PROF, MOD PADS, MIDI. Pads keep playing chords.
-- Track 2: BASS and B.EXTRA. Track 3: MELODY.
+- Track 2: BASS. Track 3: MELODY.
 - Press the open Track again, or Back, to return to PLAY. Back leaves the local
   editor or track view before leaving OKTONIK.
 - Menu toggles the clip view.
@@ -50,7 +50,7 @@ MELODY AT OFF/POLY sends polyphonic key pressure to compatible synths, not MPE.
 A held melody note keeps sounding through a chord change; strike it again for
 the new chord's tone.
 
-R.PAD on BASS knob 3 or MELODY knob 4 selects MEL/BASS for all sixteen
+R.PAD on knob 7 of BASS or MELODY selects MEL/BASS for all sixteen
 right-hand pads. Both controls change the same saved setting. Enable BASS first;
 R.PAD says so while BASS is off.
 BASS uses the bass octave, sustain, velocity and output; left-hand pads still
@@ -58,7 +58,7 @@ play chords, without adding automatic bass. Bass is monophonic, last press wins.
 Release held pads and finish recording before switching. Released sustain notes
 are cleared safely on switching. Melody AT does not apply to the bass surface.
 For bass recording, arm ALL from PLAY or BASS from Track 2; MELODY-only recording
-does not record bass notes. VEL mode and fixed B.VEL are both on B.EXTRA.
+does not record bass notes. Bass follows pad velocity; Shift + step 10 plays at 127.
 
 ## Record an accompaniment
 

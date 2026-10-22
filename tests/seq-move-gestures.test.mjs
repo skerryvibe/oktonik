@@ -70,10 +70,10 @@ test('Lab SEQ page shows COUNT and METRO; footer marks count-in',()=>{
   assert.match(h.p.inspect().model.detail,/\| CNT$/);
 });
 test('R.PAD explains that BASS must be on, but bass pads can always be switched back',()=>{
-  const h=setup('public',{bassEnabled:false});h.p.track(2);const cell=h.p.inspect().model.cells[3];
+  const h=setup('public',{bassEnabled:false});h.p.track(2);const cell=h.p.inspect().model.cells[6];
   assert.equal(cell.id,'bassPads');assert.equal(cell.value,'MEL');assert.equal(cell.disabled,true);assert.equal(cell.disabledValue,'MEL');
-  h.p.knob(3,1);assert.equal(h.p.inspect().settings.bassPads,false);assert.equal(h.p.inspect().model.detail,'Enable BASS first');
-  const on=setup('public',{bassPads:true});on.p.track(2);on.p.knob(3,-1);assert.equal(on.p.inspect().settings.bassPads,false);
+  h.p.knob(6,1);assert.equal(h.p.inspect().settings.bassPads,false);assert.equal(h.p.inspect().model.detail,'Enable BASS first');
+  const on=setup('public',{bassPads:true});on.p.track(2);on.p.knob(6,-1);assert.equal(on.p.inspect().settings.bassPads,false);
 });
 test('step LEDs light the steps a long note sounds through',()=>{
   const leds=[];const p=createPilot({profile:'lab',leds:u=>leds.splice(0,leds.length,...u)});p.init();

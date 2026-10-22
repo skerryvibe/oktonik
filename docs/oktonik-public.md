@@ -102,8 +102,8 @@ Touch or turn a knob to see its full name and value in the footer. A cell with
 shape the chords on the pads, then MIDI. The pads keep playing chords on all of
 them; Back returns to PLAY.
 
-**Track pages.** Track 1 has CHORD; Track 2 has BASS and B.EXTRA; Track 3 has
-MELODY. Turn the main encoder to move between them. Press the same Track button
+**Track pages.** Track 1 has CHORD, Track 2 has BASS and Track 3 has
+MELODY. Press the same Track button
 again, or Back, to return to PLAY.
 
 **Schwung chains (co-run).** Shift + Track 1–4 opens that chain. Knobs edit the
@@ -197,8 +197,8 @@ Track 3, MELODY:
 | 1 | MODE | CHORD, SCALE, CHROM, PENTA or BLUES. |
 | 2 | OCT | Melody register. |
 | 3 | ADAPT / TYPE | SCALE: adaptation OFF, CHORD or TARGET. PENTA/BLUES: AUTO, MAJOR or MINOR. |
-| 4 | R.PAD | Right-hand pads play MEL (melody) or BASS. |
 | 6 | AT | Polyphonic aftertouch OFF or POLY (synth must support poly pressure; not MPE). |
+| 7 | R.PAD | Right-hand pads play MEL (melody) or BASS. |
 | 8 | SUST | OFF, HOLD or PEDAL. |
 
 - **CHORD:** chord tones across registers. A held note keeps sounding when the
@@ -222,13 +222,14 @@ Track 2, BASS:
 | --- | --- | --- |
 | 1 | BASS | Automatic bass ON/OFF (ON in new projects). |
 | 2 | OCT | Bass register. |
-| 3 | R.PAD | Right-hand pads MEL or BASS (needs BASS on). |
-| 4 | B.NTE | ROOT follows the chord root; LOW uses the lowest chord tone. |
-| 5 | GEST | Bass gesture ON/OFF (ON in new projects). |
+| 3 | B.NTE | ROOT follows the chord root; LOW uses the lowest chord tone. |
+| 4 | GEST | Bass gesture ON/OFF (ON in new projects). |
+| 7 | R.PAD | Right-hand pads MEL or BASS (needs BASS on). |
 | 8 | SUST | OFF, HOLD or PEDAL. |
 
-**B.EXTRA:** VEL PAD (follows your touch) or FIXED with B.VEL; SEQ FOLW
-(sequenced bass follows the chord clip) or CLIP (its own bass clip).
+Bass follows how hard you play; Shift + step 10 (full velocity) plays everything
+at 127. A bass clip with notes plays its own bass line; an empty bass clip lets
+the bass follow the chord clip.
 
 ### Bass gesture
 

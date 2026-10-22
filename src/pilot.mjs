@@ -50,7 +50,7 @@ export function createPilot(io = {}) {
   const hasClips = features.includes('clips');
   const hasRecording = features.includes('recording');
   const hasCapture = features.includes('capture');
-  const trackPages = publicBuild ? [['CHORDS'],['BASS','B.EXTRA'],['MELODY']] : TRACK_PAGES;
+  const trackPages = publicBuild ? [['CHORDS'],['BASS'],['MELODY']] : TRACK_PAGES;
   const mainPages = publicBuild ? ['PLAY',...MAIN_VIEWS,'MIDI'] : MAIN_PAGES;
   const mainPage = () => MAIN_VIEWS.includes(quickView) ? quickView : pages[page];
   const pages = publicBuild ? PUBLIC_PAGES : PAGES;
@@ -154,7 +154,6 @@ export function createPilot(io = {}) {
     const clip=clips.parts[part].clips.find(c=>c.id===id);if(!clip)return;
     const index=CLIP_PARTS.indexOf(part);
     if(send({op:'clipbegin',index})===false){describe('Clip switch failed');return;}
-    if(part==='bass'){settings.bassPlayback='clip';config();}
     clips.parts[part].selected=id;clipOrigins[part]=origin;
     stepPages[part]=0;
     progression=selectedClip(clips,'chord').events;bassProgression=selectedClip(clips,'bass').events;melodyProgression=selectedClip(clips,'melody').events;
@@ -322,8 +321,7 @@ export function createPilot(io = {}) {
   function beginTakeUndo() {
     takeBefore={chords:['all','both','chord'].includes(settings.recordPart)?progression.map(normalizeStep):null,
       bass:['all','both','bass'].includes(settings.recordPart)&&settings.bassEnabled?bassProgression.map(normalizeBassStep):null,
-      melody:['all','melody'].includes(settings.recordPart)?melodyProgression.map(normalizeBassStep):null,
-      bassPlayback:settings.bassPlayback,changed:false};
+      melody:['all','melody'].includes(settings.recordPart)?melodyProgression.map(normalizeBassStep):null,changed:false};
   }
   function undo() {
     if(parked)return;
@@ -344,7 +342,7 @@ export function createPilot(io = {}) {
       undoTake=null;syncSlots();markSave();dirty=true;ledsDirty=true;describe('Clip edit undone; stopped');return;
     }
     if(undoTake.chords)undoTake.chords.forEach((event,i)=>progression[i]=normalizeStep(event));
-    if(undoTake.bass){undoTake.bass.forEach((event,i)=>bassProgression[i]=normalizeBassStep(event));settings.bassPlayback=undoTake.bassPlayback;}
+    if(undoTake.bass)undoTake.bass.forEach((event,i)=>bassProgression[i]=normalizeBassStep(event));
     if(undoTake.melody)undoTake.melody.forEach((event,i)=>melodyProgression[i]=normalizeBassStep(event));
     undoTake=null;config();syncSlots();markSave();ledsDirty=true;dirty=true;
     describe('Recording undone; stopped');
@@ -426,7 +424,7 @@ export function createPilot(io = {}) {
     const event=normalizeBassStep({note:take.payload,...take.timing,performance:take.performance});
     if(!insertTake(bassProgression,take,event,bassVisited)){recordLimit=true;return;}
     if(takeBefore)takeBefore.changed=true;
-    settings.bassPlayback='clip';config();syncSlots();markSave();ledsDirty=true;dirty=true;
+    syncSlots();markSave();ledsDirty=true;dirty=true;
   }
   function recordBass(owner) {
     if(!recordsBass())return;
@@ -530,14 +528,15 @@ export function createPilot(io = {}) {
     else { saveTicks = 90; describe('Save pending'); }
     return result;
   }
+  // A bass clip with notes plays itself; an empty one follows the chord clip.
+  const bassFromClip = () => bassProgression.some(Boolean);
   function config() { batched(sendConfig); }
   function sendConfig() {
     sendState({ op: 'config', channel: settings.channel, route: ROUTES.indexOf(settings.route), divisi: !publicBuild && settings.divisi ? (settings.ensembleSmooth?2:1) : 0,
       ...(!publicBuild?{channels:[...settings.ensembleChannels]}:{}),
       rate: settings.rate, gate: settings.autoSustain ? 100 : settings.gate, move_available: moveAvailable ? 1 : 0,
       legato: settings.voiceLead ? 1 : 0, bass_route: ROUTES.indexOf(settings.bassRoute),
-      bass_channel: settings.bassChannel, bass_velocity: settings.bassVelocity,
-      bass_clip:+(settings.bassEnabled && settings.bassPlayback==='clip') });
+      bass_channel: settings.bassChannel, bass_clip:+(settings.bassEnabled && bassFromClip()) });
     if(hasClips)sendState({op:'melodyconfig',route:ROUTES.indexOf(settings.melodyRoute),channel:settings.melodyChannel});
     sendState({ op: 'arp', enabled: +settings.arpEnabled, rate: settings.arpRate,
       direction: settings.arpDirection, range: settings.arpRange, gate: settings.arpGate,
@@ -561,7 +560,7 @@ export function createPilot(io = {}) {
   function strumCommand(s) {
     return {strum_ms:s?.strumMs??0,strum_dir:s?.strumDirection??0,strum_time:s?.strumTiming??0,strum_vel:s?.strumVelocity??0};
   }
-  function syncSlots() { batched(uploadSlots); }
+  function syncSlots() { batched(() => { sendConfig(); uploadSlots(); }); }
   function uploadSlots() {
     slotWriteFailed=false;
     if (!hasClips) return;
@@ -696,7 +695,7 @@ export function createPilot(io = {}) {
     const snap = selected.chord.snapshot;
     const notes = gestureBass !== null ? [gestureBass] : snap ? snap.bass >= 0 ? [snap.bass] : [] : bassNotes(selected.chord, settings, selected.notes);
     if (!notes.length) { stop(LIVE_BASS_OWNER); return; }
-    const velocity = settings.bassVelocityMode === 'pad' ? gestureVelocity ?? selected.velocity : settings.bassVelocity;
+    const velocity = gestureVelocity ?? selected.velocity;
     if (!same(voices.get(LIVE_BASS_OWNER)?.notes, notes) || voices.get(LIVE_BASS_OWNER)?.velocity !== velocity) {
       if(settings.bassSustain==='pedal' && voices.has(LIVE_BASS_OWNER)) {stop(LIVE_BASS_OWNER);pedal('bass',false);}
       play(LIVE_BASS_OWNER, notes, velocity, { kind: 'bass', chord: selected.chord, audition:!!selected.audition });
@@ -984,8 +983,7 @@ export function createPilot(io = {}) {
         const notes=bassNotes({...chord,bassMode:'root'},settings,chordNotes(chord,settings));
         if(!notes.length)return;
         stop(LIVE_BASS_OWNER);pedal('bass',false);
-        const vel=settings.bassVelocityMode==='pad'?velocity:settings.bassVelocity;
-        play(LIVE_BASS_OWNER,notes,vel,{kind:'bass',chord});bassRecordOwner=chordIndex;
+        play(LIVE_BASS_OWNER,notes,velocity,{kind:'bass',chord});bassRecordOwner=chordIndex;
         recordBass(chordIndex);describe('Bass '+bassNoteName(notes[0]));return;
       }
       if (!pressed) {
@@ -1049,7 +1047,7 @@ export function createPilot(io = {}) {
         if(!Number.isInteger(pitch)){describe('Note outside MIDI');return;}
         bassOnlyHeld.add(id);bassExpressionPad=id;
         stop(LIVE_BASS_OWNER);pedal('bass',false);
-        play(LIVE_BASS_OWNER,[pitch],settings.bassVelocityMode==='pad'?velocity:settings.bassVelocity,{kind:'bass',chord:active.chord},true);
+        play(LIVE_BASS_OWNER,[pitch],velocity,{kind:'bass',chord:active.chord},true);
         bassRecordOwner=id;recordBass(id);describe('Bass '+bassNoteName(pitch));return;
       }
       const pitch = melodyNotes(active.chord, melodyContext())[melodyIndex];
@@ -1114,7 +1112,6 @@ export function createPilot(io = {}) {
         const played=lastPlayed[part];if(!played){describe('Play a '+part+' note first');return;}
         const fresh=!modifiers.shift&&!target[index];
         undoTake=null;target[index]=normalizeBassStep({...played,steps:1});
-        if(part==='bass'){settings.bassPlayback='clip';config();}
         if(fresh)stepEdit=index;
         syncSlots();markSave();notice('Saved '+part+' '+(index+1));return;
       }
@@ -1164,7 +1161,7 @@ export function createPilot(io = {}) {
     const events=cellEvents(clone(stepCopy.cell)).map(({more,...e})=>e.performance?{...e,performance:{...e.performance,start:e.performance.start+offset}}:e);
     if(events.some(e=>e.performance&&(e.performance.start<0||e.performance.start>=target.length))){notice('Step outside clip');return;}
     target[index]={...events[0],...(events.length>1?{more:events.slice(1)}:{})};
-    undoTake=null;if(part==='bass'){settings.bassPlayback='clip';config();}
+    undoTake=null;
     selectedSlot=index;syncSlots();markSave();dirty=true;ledsDirty=true;notice('Pasted step '+(index+1));
   }
   function setClipLength(length) {
@@ -1277,19 +1274,21 @@ export function createPilot(io = {}) {
         ['pentatonic','blues'].includes(mode)
           ? field('melodySoloType','TYPE',settings.melodySoloType.toUpperCase(),'Solo palette')
           : field('melodyAdapt', 'ADAPT', settings.melodyAdapt ? settings.melodyAdaptTarget?'TARGET':'CHORD' : 'OFF', 'Adaptive scale', settings.melodyAdapt ? settings.melodyAdaptTarget?'TARGET':'CHORD' : 'OFF', mode === 'scale' ? '' : 'ADAPT: use SCALE mode'),
+        blank(),
+        blank(),
+        publicBuild ? field('melodyAftertouch','AT',settings.melodyAftertouch?'POLY':'OFF','Melody AT') : field('melodyExpression','AT',settings.melodyExpression.toUpperCase(),'Melody AT'),
         rightPads,
         field('melodySustain','SUST',settings.melodySustain.toUpperCase(),'Melody sustain'),
-        publicBuild ? field('melodyAftertouch','AT',settings.melodyAftertouch?'POLY':'OFF','Melody AT') : field('melodyExpression','AT',settings.melodyExpression.toUpperCase(),'Melody AT'),
       ],
       BASS: () => [
         field('bassEnabled', 'BASS', settings.bassEnabled ? 'ON' : 'OFF', 'Automatic bass'),
         field('bassOctave', 'B.OCT', settings.bassOctave, 'Bass octave'),
-        rightPads,
         field('bassMode', 'B.NTE', settings.bassMode.toUpperCase(), 'Bass note'),
         field('bassGesture', 'GEST', settings.bassGesture ? 'ON' : 'OFF', 'Bass gesture'),
-        field('bassSustain','SUST',settings.bassSustain.toUpperCase(),'Bass sustain'),
         blank(),
         publicBuild ? blank() : field('bassExpression','AT',settings.bassExpression.toUpperCase(),'Bass expression'),
+        rightPads,
+        field('bassSustain','SUST',settings.bassSustain.toUpperCase(),'Bass sustain'),
       ],
       'M.EXTRA': () => [
         field('melodyFollow','TRACK',settings.melodyFollow==='nearest'?'NEAR':'PAD','Hold',settings.melodyFollow==='nearest'?'Nearest tone':'Pad position',mode==='chord'?'':'TRACK: use CHORD mode'),
@@ -1298,10 +1297,8 @@ export function createPilot(io = {}) {
         publicBuild ? blank() : field('melodyExpressionMax','MAX',settings.melodyExpressionMax,'Max CC value'),
       ],
       'B.EXTRA': () => [
-        field('bassVelocityMode','VEL',settings.bassVelocityMode.toUpperCase(),'Bass vel. mode'),
-        field('bassVelocity','B.VEL',settings.bassVelocity,'Bass velocity',settings.bassVelocity,settings.bassVelocityMode==='pad'?'VEL PAD: uses attack':''),
-        field('bassPlayback','SEQ',settings.bassPlayback==='follow'?'FOLW':'CLIP','Sequenced bass',settings.bassPlayback==='follow'?'Follow chords':'Bass clip'),
         publicBuild ? blank() : field('smartBass','SMART',voices.has(LIVE_BASS_OWNER)?bassNoteName(voices.get(LIVE_BASS_OWNER).notes[0]):'--','Smart Bass','Chord tones'),
+        blank(),
         publicBuild ? blank() : field('bassExpressionMin','MIN',settings.bassExpressionMin,'Min CC value'),
         publicBuild ? blank() : field('bassExpressionMax','MAX',settings.bassExpressionMax,'Max CC value'),
       ],
@@ -1352,9 +1349,7 @@ export function createPilot(io = {}) {
       if(row && features.includes('trackNavigation')) {
         if(name==='CHORDS')[row[1],row[3]]=[row[3],row[1]];
         if(name==='MELODY'||name==='BASS')row[1].label='OCT';
-        // Shared physical homes: AT on knob 6, sustain on knob 8.
-        if(name==='MELODY'){const melodySustain=row[4];row[4]=blank();row[7]=melodySustain;}
-        if(name==='BASS'){const bassSustain=row[5];row[5]=row[7];row[7]=bassSustain;}
+        // Shared physical homes, set in the rows: AT knob 6, R.PAD knob 7, SUST knob 8.
       }
       return row;
     };
@@ -1512,7 +1507,6 @@ export function createPilot(io = {}) {
       describe('Record part: '+next.toUpperCase());return;
     }
     if(id==='seqPart'){seqPart=['chord','bass','melody'][clamp(['chord','bass','melody'].indexOf(seqPart)+delta,0,2)];focused=-1;ledsDirty=true;describe('Steps: '+seqPart);return;}
-    if(id==='bassPlayback'){undoTake=null;settings.bassPlayback=delta>0?'clip':'follow';config();markSave();describe('Bass sequence: '+settings.bassPlayback);return;}
     if(stepEdit>=0 && id.startsWith('event')) {
       undoTake=null;
       const event=editedEvent();
@@ -1698,7 +1692,6 @@ export function createPilot(io = {}) {
     else if (id === 'melodyFollow') value = delta > 0 ? 'nearest' : 'pad';
     else if (id === 'arpClock') value = delta > 0 ? 'free' : 'sync';
     else if (id.endsWith('Sustain')) value = sustainModes[clamp(sustainModes.indexOf(settings[id])+delta,0,2)];
-    else if (id === 'bassVelocityMode') value = delta > 0 ? 'fixed' : 'pad';
     else if (['chordExpression','bassExpression','melodyExpression'].includes(id)) value=['off','poly','cc1','cc11'][clamp(['off','poly','cc1','cc11'].indexOf(settings[id])+delta,0,3)];
     else if (/^(bass|melody)ExpressionMin$/.test(id)) value=clamp(settings[id]+delta,0,settings[id.replace('Min','Max')]);
     else if (/^(bass|melody)ExpressionMax$/.test(id)) value=clamp(settings[id]+delta,settings[id.replace('Max','Min')],127);
@@ -1717,7 +1710,7 @@ export function createPilot(io = {}) {
     else {
       const ranges = { color: [0, 2], inversion: [0, 3], spread: [0, 2], octave: [-3, 3],
         melodyOctave: [-3, 3], bassOctave: [BASS_OCTAVE_MIN, BASS_OCTAVE_MAX],
-        bassVelocity: [1, 127], stepVelocity: [1, 127], channel: [0, 15], melodyChannel: [0, 15], bassChannel: [0, 15],
+        stepVelocity: [1, 127], channel: [0, 15], melodyChannel: [0, 15], bassChannel: [0, 15],
         arpBpm: [30, 300], arpRate: [0, 4], arpDirection: [0, 4], arpRange: [1, 4], arpGate: [10, 100], arpSwing: [0, 50], arpVelocity: [1, 127], arpChannel: [0, 15],
         strumDirection:[0,3],strumTiming:[0,100],strumVelocity:[0,100],strumMs: [0, 100, 5], rate: [0, 4], gate: [10, 100, 5] };
       const range = ranges[id];
@@ -1946,8 +1939,8 @@ export function createPilot(io = {}) {
     const event=Number.isInteger(dsp.event)?dsp.event:dsp.slot;
     if (dsp.loop_sounding && runtimeChords[event]) notes.push(...runtimeChords[event].event.snapshot.notes);
     if(dsp.bass_sounding) {
-      if(settings.bassPlayback==='clip' && runtimeBass[dsp.be])notes.push(runtimeBass[dsp.be].event.note);
-      else if(settings.bassPlayback!=='clip' && runtimeChords[event]?.event.snapshot.bass>=0)notes.push(runtimeChords[event].event.snapshot.bass);
+      if(bassFromClip() && runtimeBass[dsp.be])notes.push(runtimeBass[dsp.be].event.note);
+      else if(!bassFromClip() && runtimeChords[event]?.event.snapshot.bass>=0)notes.push(runtimeChords[event].event.snapshot.bass);
     }
     const sounding = [...new Set(notes)].sort((a, b) => a - b);
     const harmony = context();

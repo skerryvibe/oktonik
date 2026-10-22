@@ -510,7 +510,7 @@ static void start_loop_bass(Pilot *s, Slot *slot) {
     if(s->bass_clip || (s->recording&2) || (s->clip_loading&3))return;
     if (slot->bass >= 0) {
         uint8_t bass = (uint8_t)slot->bass;
-        start_voice(s,LOOP_BASS_OWNER,&bass,1,s->bass_velocity,s->bass_route,s->bass_channel,0,0,0);
+        start_voice(s,LOOP_BASS_OWNER,&bass,1,slot->velocity,s->bass_route,s->bass_channel,0,0,0);
     } else release_voice(s,LOOP_BASS_OWNER);
 }
 static void start_loop(Pilot *s, Slot *slot) {

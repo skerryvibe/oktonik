@@ -63,7 +63,7 @@
     {
       "title": "Right-hand bass pads",
       "lines": [
-        "BASS knob 3 R.PAD: BASS.",
+        "BASS knob 7 R.PAD: BASS.",
         "Left pads keep playing chords.",
         "Right pads play monophonic bass.",
         "Bass octave, output, SUST, AT.",
@@ -80,7 +80,7 @@
         "Enable BASS and play a chord.",
         "Keep held, or use SUST HOLD.",
         "Track 2, jog to B.EXTRA.",
-        "Knob 4 SMART; R.PAD MELODY.",
+        "Knob 1 SMART; R.PAD MELODY.",
         "Choose a real chord-tone bass.",
         "Chord does not retrigger.",
         "Next chord resets this choice.",
@@ -122,7 +122,7 @@
         "Hold Shift for page extras.",
         "PLAY / CHORDS: STRUM+.",
         "MELODY: M.EXTR+ (TRACK, AT).",
-        "BASS: B.EXTR+ (VEL, B.VEL, SEQ).",
+        "BASS: B.EXTR+ (SMART, AT range).",
         "ARP: A.CLK+ (clock and tempo).",
         "MIDI: ENS.CH+ (voice channels).",
         "Release Shift: return to parent.",
@@ -242,15 +242,11 @@
     {
       "title": "Bass velocity",
       "lines": [
-        "Hold Shift on BASS for B.EXTR+.",
-        "Knob 1 VEL: PAD / FIXED.",
-        "PAD follows chord-pad attack.",
+        "Bass follows chord-pad attack.",
         "Gesture uses bass-selector attack.",
-        "FIXED uses knob 2 B.VEL.",
-        "New projects start with PAD.",
-        "Old projects retain FIXED.",
-        "FOLW sequence uses B.VEL.",
-        "CLIP keeps recorded velocity."
+        "Shift+step 10: full velocity.",
+        "Chord-clip bass uses step VEL.",
+        "Bass clip keeps recorded velocity."
       ]
     },
     {
@@ -415,7 +411,7 @@
         "BASS: enable automatic bass.",
         "GEST: hold chord, tap bass root.",
         "B.OCT: independent, -5 to +6.",
-        "Shift+BASS: VEL, B.VEL, SEQ.",
+        "R.PAD knob 7, SUST knob 8.",
         "B.NTE ROOT: chord root.",
         "B.NTE LOW: lowest voiced note.",
         "LOW follows LEAD and inversion.",
@@ -623,8 +619,8 @@
       "lines": [
         "BOTH records chord and enabled bass.",
         "Gesture changes are separate notes.",
-        "Shift+BASS knob 3: FOLW / CLIP.",
-        "New bass recording selects CLIP.",
+        "Bass clip with notes plays it.",
+        "Empty bass clip follows chords.",
         "SEQ PART chooses editing lane.",
         "Hold saved step: temporary editor.",
         "Chord: ROOT / EXT / LEN / VEL.",

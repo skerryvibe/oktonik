@@ -182,8 +182,8 @@
       "title": "Right-hand bass",
       "lines": [
         "R.PAD MEL/BASS:",
-        "BASS knob 3 or",
-        "MELODY knob 4.",
+        "knob 7 on BASS",
+        "and MELODY.",
         "Enable BASS first.",
         "Uses bass settings",
         "and MIDI output.",
@@ -191,7 +191,8 @@
         "Release pads before",
         "switching. Stop REC.",
         "Record ALL or BASS.",
-        "B.VEL: B.EXTRA."
+        "Bass follows touch;",
+        "Shift+10: full vel."
       ]
     },
     {

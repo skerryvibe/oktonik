@@ -53,7 +53,7 @@ test('Public main and track rings expose only release controls',()=>{
  for(const name of ['EXT PROF','MOD PADS','MIDI','PLAY']){p.browse(1);assert.equal(p.inspect().model.pageName,name);}
  p.browse(-1);assert.equal(p.inspect().model.pageName,'MIDI');p.browse(-2);assert.equal(p.inspect().model.pageName,'EXT PROF');
  p.back();assert.equal(p.inspect().model.pageName,'PLAY');
- for(const [track,names] of [['CHORD'],['BASS','B.EXTRA'],['MELODY']].entries()){
+ for(const [track,names] of [['CHORD'],['BASS'],['MELODY']].entries()){
   p.track(track);const base=p.inspect().model;
   assert.equal(base.cells[1].label,'OCT');assert.equal(base.cells[7].label,'SUST');
   if(track===0)assert.equal(base.cells[5].id,'voiceLead');
@@ -66,7 +66,7 @@ for(const profile of ['public','lab'])test(`${profile}: pressing the open Track 
  const p=createPilot({profile});p.init();
  p.track(0);assert.equal(p.inspect().model.pageName,profile==='public'?'CHORD':'CHORDS');
  p.track(0);assert.equal(p.inspect().model.pageName,'PLAY');
- p.track(1);p.browse(1);assert.equal(p.inspect().model.pageName,'B.EXTRA');
+ p.track(1);p.browse(1);assert.equal(p.inspect().model.pageName,profile==='public'?'BASS':'B.EXTRA');
  p.track(2);assert.equal(p.inspect().model.pageName,'MELODY');p.track(2);assert.equal(p.inspect().model.pageName,'PLAY');
  p.track(1);p.shiftStep(2);assert.equal(p.inspect().model.pageName,'SETUP');
  p.track(1);assert.equal(p.inspect().model.pageName,'BASS'); // a menu over the track closes to the track first

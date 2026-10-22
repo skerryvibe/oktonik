@@ -67,7 +67,7 @@ test('TO offers iv-bVII and leading diminished paths while preserving II V TARGE
 function setup(settings={}) {
   const commands=[];let saved=encodeDocument({bassEnabled:true,bassGesture:true,...settings},[]),clock={beat:0,ready:false};
   const p=createPilot({clock:()=>clock,read:()=>saved,write:(k,v)=>{saved=v;return true;},send:c=>{commands.push(c);return true;}});p.init();
-  const smart=d=>{if(p.inspect().model.pageName!=='B.EXTRA'){p.track(1);p.browse(1);}p.knob(3,d);};
+  const smart=d=>{if(p.inspect().model.pageName!=='B.EXTRA'){p.track(1);p.browse(1);}p.knob(0,d);};
   return {p,commands,smart,saved:()=>saved,time:beat=>clock={beat,ready:true}};
 }
 const bass=p=>p.inspect().voices.find(([id,v])=>v.kind==='bass')?.[1];

@@ -718,8 +718,9 @@ static void test_retrigger_channel_isolation_and_failure(void) {
 
 static void test_loop_bass_routing_gate_and_toggle(void) {
     reset(); void *s=plugin->create_instance("",0);
-    command(s,"{\"op\":\"config\",\"bass_route\":3,\"bass_channel\":4,\"bass_velocity\":75}");
-    command(s,"{\"op\":\"slot\",\"index\":0,\"notes\":[60,64,67],\"bass\":36}");
+    command(s,"{\"op\":\"config\",\"bass_route\":3,\"bass_channel\":4}");
+    /* Follow bass plays at the chord step's velocity. */
+    command(s,"{\"op\":\"slot\",\"index\":0,\"notes\":[60,64,67],\"bass\":36,\"velocity\":75}");
     command(s,"{\"op\":\"arm\",\"enabled\":1}");
     clock_status=MOVE_CLOCK_STATUS_RUNNING; tick(s,10);
     assert(count(MOVE,1,-1)==3 && count(CHAIN,1,36)==1);

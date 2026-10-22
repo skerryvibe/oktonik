@@ -38,7 +38,7 @@ test('Bass Gesture records a separate C/E/G lane and survives owner release and 
   const state=h.p.inspect();assert.equal(state.progression.filter(Boolean).length,1);
   assert.equal(state.progression[0].timing.steps,4);
   assert.deepEqual(state.bassProgression.filter(Boolean).map(e=>[e.note%12,e.steps,e.velocity]),[[0,1,91],[4,1,72],[7,2,65]]);
-  assert.equal(state.settings.bassPlayback,'clip');h.p.unload();
+  assert.equal(h.commands.findLast(c=>c.op==='config').bass_clip,1);h.p.unload();
   assert.deepEqual(setup({},h.files).p.inspect().bassProgression,state.bassProgression);
 });
 test('bass-only overdub preserves chords, selects roots, and ignores old/shifted releases',()=>{
@@ -234,4 +234,11 @@ test('project switch saves the pending take only to the outgoing project and nev
   assert.equal(p.inspect().recordArmed,false);assert.ok(p.inspect().progression.every(c=>!c));
   now=2000;files.set(ACTIVE_SET_PATH,'set-A\nFirst');p.tick();
   assert.deepEqual(p.inspect().progression[0].timing,{steps:3,velocity:69});assert.equal(p.inspect().recordArmed,false);
+});
+test('bass plays its clip while the clip has notes and otherwise follows the chord clip',()=>{
+  const files=new Map([[STATE_PATH,encodeDocument({bassEnabled:true,bassPlayback:'follow'},[],[],[{note:36,steps:1,velocity:68}])]]);
+  const h=setup({},files),bassClip=()=>h.commands.findLast(c=>c.op==='config').bass_clip;
+  assert.equal(bassClip(),1);
+  h.page('SEQ');h.p.knob(3,1);h.p.step(0,true,{delete:true});
+  assert.ok(h.p.inspect().bassProgression.every(e=>e===null));assert.equal(bassClip(),0);
 });
